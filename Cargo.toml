@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "2"
-members = ["src/*"]
+members = ["src/*", "tests/shadow"]
 default-members = ["src/*"]
 
 [workspace.package]
@@ -700,6 +700,13 @@ inherits = "release-native.build-override"
 #	'-Crelocation-model=pic',
 #	'-Ctarget-feature=-crt-static',
 #]
+
+# Shadow deterministic simulation profile; io_uring must NOT be enabled.
+# Build: cargo build --profile shadow --no-default-features --features shadow_features
+[profile.shadow]
+inherits = "release"
+strip = "symbols"
+debug = false
 
 [profile.bench]
 debug = false
