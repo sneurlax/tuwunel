@@ -10,14 +10,14 @@ use tuwunel_core::{
 };
 
 #[cfg(feature = "perf_measurements")]
-pub(crate) type TracingFlameGuard =
+pub type TracingFlameGuard =
 	Option<tracing_flame::FlushGuard<std::io::BufWriter<std::fs::File>>>;
 
 #[cfg(not(feature = "perf_measurements"))]
-pub(crate) type TracingFlameGuard = ();
+pub type TracingFlameGuard = ();
 
 #[allow(clippy::redundant_clone)]
-pub(crate) fn init(
+pub fn init(
 	config: &Config,
 ) -> Result<(LogLevelReloadHandles, TracingFlameGuard, Arc<capture::State>)> {
 	let reload_handles = LogLevelReloadHandles::default();

@@ -35,17 +35,11 @@ pub fn new(args: Option<&Args>) -> Result<Runtime> {
 	let args_default = args.is_none().then(Args::default);
 	let args = args.unwrap_or_else(|| args_default.as_ref().expect("default arguments"));
 
-	WORKER_AFFINITY
-		.set(args.worker_affinity)
-		.expect("set WORKER_AFFINITY from program argument");
+	WORKER_AFFINITY.get_or_init(|| args.worker_affinity);
 
-	GC_ON_PARK
-		.set(args.gc_on_park)
-		.expect("set GC_ON_PARK from program argument");
+	GC_ON_PARK.get_or_init(|| args.gc_on_park);
 
-	GC_MUZZY
-		.set(args.gc_muzzy)
-		.expect("set GC_MUZZY from program argument");
+	GC_MUZZY.get_or_init(|| args.gc_muzzy);
 
 	let mut builder = Builder::new_multi_thread();
 	builder

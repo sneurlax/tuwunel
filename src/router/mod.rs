@@ -8,7 +8,9 @@ mod serve;
 
 use std::{panic::AssertUnwindSafe, pin::Pin, sync::Arc};
 
+use axum::Router;
 use futures::{Future, FutureExt, TryFutureExt};
+use tuwunel_api::router::state::Guard;
 use tuwunel_core::{Error, Result, Server};
 use tuwunel_service::Services;
 
@@ -47,4 +49,12 @@ pub extern "Rust" fn run(
 		.map_err(Error::from_panic)
 		.unwrap_or_else(Err)
 		.boxed()
+}
+
+/// Build the axum [`Router`] with all middleware. The returned
+/// [`Guard`] must outlive the Router.
+pub fn build_router(
+	services: &Arc<Services>,
+) -> Result<(Router, Guard)> {
+	layers::build(services)
 }
