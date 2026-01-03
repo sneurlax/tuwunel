@@ -49,7 +49,7 @@ pub(crate) async fn set_displayname_route(
 	// Presence update
 	services
 		.presence
-		.maybe_ping_presence(&body.user_id, &PresenceState::Online)
+		.maybe_ping_presence(&body.user_id, body.sender_device.as_deref(), &PresenceState::Online)
 		.await?;
 
 	Ok(set_display_name::v3::Response {})
@@ -68,8 +68,8 @@ pub(crate) async fn get_displayname_route(
 	if !services.globals.user_is_local(&body.user_id) {
 		// Create and update our local copy of the user
 		if let Ok(response) = services
-			.sending
-			.send_federation_request(
+			.federation
+			.execute(
 				body.user_id.server_name(),
 				federation::query::get_profile_information::v1::Request {
 					user_id: body.user_id.clone(),
@@ -149,7 +149,7 @@ pub(crate) async fn set_avatar_url_route(
 	// Presence update
 	services
 		.presence
-		.maybe_ping_presence(&body.user_id, &PresenceState::Online)
+		.maybe_ping_presence(&body.user_id, body.sender_device.as_deref(), &PresenceState::Online)
 		.await
 		.ok();
 
@@ -169,8 +169,8 @@ pub(crate) async fn get_avatar_url_route(
 	if !services.globals.user_is_local(&body.user_id) {
 		// Create and update our local copy of the user
 		if let Ok(response) = services
-			.sending
-			.send_federation_request(
+			.federation
+			.execute(
 				body.user_id.server_name(),
 				federation::query::get_profile_information::v1::Request {
 					user_id: body.user_id.clone(),
@@ -231,8 +231,8 @@ pub(crate) async fn get_profile_route(
 	if !services.globals.user_is_local(&body.user_id) {
 		// Create and update our local copy of the user
 		if let Ok(response) = services
-			.sending
-			.send_federation_request(
+			.federation
+			.execute(
 				body.user_id.server_name(),
 				federation::query::get_profile_information::v1::Request {
 					user_id: body.user_id.clone(),

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use futures::{StreamExt, TryStreamExt};
 use tokio::sync::Mutex;
@@ -12,7 +12,7 @@ use crate::{
 	account_data, admin, appservice, client, config, deactivate, emergency, federation, globals,
 	key_backups,
 	manager::Manager,
-	media, membership, presence, pusher, resolver, rooms, sending, server_keys,
+	media, membership, oauth, presence, pusher, resolver, rooms, sending, server_keys,
 	service::{Args, Service},
 	sync, transaction_ids, uiaa, users,
 };
@@ -49,7 +49,6 @@ pub struct Services {
 	pub threads: Arc<rooms::threads::Service>,
 	pub timeline: Arc<rooms::timeline::Service>,
 	pub typing: Arc<rooms::typing::Service>,
-	pub user: Arc<rooms::user::Service>,
 	pub federation: Arc<federation::Service>,
 	pub sending: Arc<sending::Service>,
 	pub server_keys: Arc<server_keys::Service>,
@@ -59,6 +58,7 @@ pub struct Services {
 	pub users: Arc<users::Service>,
 	pub membership: Arc<membership::Service>,
 	pub deactivate: Arc<deactivate::Service>,
+	pub oauth: Arc<oauth::Service>,
 
 	manager: Mutex<Option<Arc<Manager>>>,
 	pub server: Arc<Server>,
@@ -107,7 +107,6 @@ pub async fn build(server: Arc<Server>) -> Result<Arc<Self>> {
 		threads: rooms::threads::Service::build(&args)?,
 		timeline: rooms::timeline::Service::build(&args)?,
 		typing: rooms::typing::Service::build(&args)?,
-		user: rooms::user::Service::build(&args)?,
 		federation: federation::Service::build(&args)?,
 		sending: sending::Service::build(&args)?,
 		server_keys: server_keys::Service::build(&args)?,
@@ -117,6 +116,7 @@ pub async fn build(server: Arc<Server>) -> Result<Arc<Self>> {
 		users: users::Service::build(&args)?,
 		membership: membership::Service::build(&args)?,
 		deactivate: deactivate::Service::build(&args)?,
+		oauth: oauth::Service::build(&args)?,
 
 		manager: Mutex::new(None),
 		server,
@@ -166,7 +166,6 @@ pub(crate) fn services(&self) -> impl Iterator<Item = Arc<dyn Service>> + Send {
 		cast!(self.threads),
 		cast!(self.timeline),
 		cast!(self.typing),
-		cast!(self.user),
 		cast!(self.federation),
 		cast!(self.sending),
 		cast!(self.server_keys),
@@ -176,8 +175,15 @@ pub(crate) fn services(&self) -> impl Iterator<Item = Arc<dyn Service>> + Send {
 		cast!(self.users),
 		cast!(self.membership),
 		cast!(self.deactivate),
+		cast!(self.oauth),
 	]
 	.into_iter()
+}
+
+impl fmt::Debug for Services {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("Services").finish()
+	}
 }
 
 #[implement(Services)]

@@ -28,8 +28,8 @@ keywords = [
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/matrix-construct/tuwunel"
-rust-version = "1.88.0"
-version = "1.4.5"
+rust-version = "1.89.0"
+version = "1.4.8"
 
 [workspace.metadata.crane]
 name = "tuwunel"
@@ -76,6 +76,7 @@ version = "0.7"
 version = "0.10"
 default-features = false
 features = [
+	"cookie",
 	"typed-header",
 	"tracing",
 ]
@@ -104,7 +105,7 @@ features = [
 version = "1.10"
 
 [workspace.dependencies.bytesize]
-version = "2.0"
+version = "2.1"
 
 [workspace.dependencies.cargo_toml]
 version = "0.22"
@@ -192,7 +193,7 @@ version = "1.3"
 version = "0.1"
 
 [workspace.dependencies.hyper]
-version = "1.6"
+version = "1.7"
 default-features = false
 features = [
 	"server",
@@ -231,6 +232,10 @@ version = "0.1"
 [workspace.dependencies.itertools]
 version = "0.14"
 
+[workspace.dependencies.jevmalloc]
+git = "https://github.com/matrix-construct/jevmalloc"
+rev = "93795449913f65ab533b7fa482333eef63fc3ae0"
+
 [workspace.dependencies.jsonwebtoken]
 version = "9.3"
 default-features = false
@@ -238,7 +243,7 @@ features = ["use_pem"]
 
 [workspace.dependencies.ldap3]
 git = "https://github.com/matrix-construct/ldap3"
-rev = "7d423314b9dbc66347284e38fc2b78c3d8f3d494"
+rev = "fdfbba2bf916b53e5f73cdb1a495ebb649978079"
 default-features = false
 features = ["sync", "tls-rustls"]
 
@@ -262,7 +267,7 @@ version = "0.1"
 version = "1.0"
 
 [workspace.dependencies.minicbor]
-version = "2.0"
+version = "2.1"
 features = ["std"]
 
 [workspace.dependencies.minicbor-serde]
@@ -281,7 +286,7 @@ features = [
 version = "0.2"
 
 [workspace.dependencies.opentelemetry]
-version = "0.30.0"
+version = "0.31"
 
 # Disabled until they move to opentelemetry 0.30
 #[workspace.dependencies.opentelemetry-jaeger]
@@ -289,7 +294,7 @@ version = "0.30.0"
 #features = ["rt-tokio"]
 
 [workspace.dependencies.opentelemetry_sdk]
-version = "0.30"
+version = "0.31"
 features = ["rt-tokio"]
 
 [workspace.dependencies.proc-macro2]
@@ -302,16 +307,18 @@ version = "1.0"
 version = "0.8"
 
 [workspace.dependencies.regex]
-version = "1.11"
+version = "1.12"
 
 [workspace.dependencies.reqwest]
 version = "0.12"
 default-features = false
 features = [
-	"rustls-tls-native-roots",
-	"socks",
+	"charset",
 	"hickory-dns",
 	"http2",
+	"json",
+	"rustls-tls-native-roots",
+	"socks",
 ]
 
 [workspace.dependencies.ring]
@@ -320,7 +327,7 @@ default-features = false
 
 [workspace.dependencies.ruma]
 git = "https://github.com/matrix-construct/ruma"
-rev = "b858d3478f2792a381463ef9b63f6c1469a5d81c"
+rev = "ff66bdd9975152f0382d753120dddddf3577ad51"
 features = [
     "__compat",
     "appservice-api-c",
@@ -339,6 +346,7 @@ features = [
     "unstable-msc2870",
     "unstable-msc3026",
     "unstable-msc3061",
+    "unstable-msc3814",
     "unstable-msc3245",
     "unstable-msc3381", # polls
     "unstable-msc3489", # beacon / live location
@@ -348,6 +356,7 @@ features = [
     "unstable-msc4121",
     "unstable-msc4125",
     "unstable-msc4133",
+    "unstable-msc4143",
     "unstable-msc4186",
     "unstable-msc4203", # sending to-device events to appservices 
     "unstable-msc4310",
@@ -358,7 +367,7 @@ features = [
 [workspace.dependencies.rustls]
 version = "0.23"
 default-features = false
-features = ["aws_lc_rs"]
+features = ["aws_lc_rs", "logging", "tls12", "prefer-post-quantum"]
 
 [workspace.dependencies.rustyline-async]
 version = "0.4.6"
@@ -366,14 +375,16 @@ default-features = false
 
 [workspace.dependencies.rust-rocksdb]
 git = "https://github.com/matrix-construct/rust-rocksdb"
-rev = "225a42519276e502205bdc845cebdb22d70ee245"
+rev = "c11395350bc1f2090a0152f2d15c8c5847821eba"
 default-features = false
 features = [
 	"bzip2",
+	"lto",
 	"lz4",
 	"multi-threaded-cf",
-	"mt_static",
+	"serde1",
 	"zstd",
+	"zstd-static-linking-only",
 ]
 
 [workspace.dependencies.sanitize-filename]
@@ -384,7 +395,7 @@ version = "0.4"
 default-features = false
 
 [workspace.dependencies.sentry]
-version = "0.42"
+version = "0.45"
 default-features = false
 features = [
     "backtrace",
@@ -400,15 +411,19 @@ features = [
 ]
 
 [workspace.dependencies.sentry-tower]
-version = "0.42"
+version = "0.45"
 
 [workspace.dependencies.sentry-tracing]
-version = "0.42"
+version = "0.45"
 
 [workspace.dependencies.serde]
 version = "1.0"
 default-features = false
 features = ["rc"]
+
+[workspace.dependencies.serde_core]
+version = "1.0"
+default-features = false
 
 [workspace.dependencies.serde_html_form]
 version = "0.2"
@@ -473,32 +488,8 @@ default-features = false
 version = "2.0"
 default-features = false
 
-[workspace.dependencies.tikv-jemallocator]
-git = "https://github.com/matrix-construct/jemallocator"
-rev = "03bed96afbbc898bef4d4f7d335c0519e3d1afad"
-default-features = false
-features = [
-	"background_threads_runtime_support",
-	"unprefixed_malloc_on_supported_platforms",
-]
-
-[workspace.dependencies.tikv-jemalloc-ctl]
-git = "https://github.com/matrix-construct/jemallocator"
-rev = "03bed96afbbc898bef4d4f7d335c0519e3d1afad"
-default-features = false
-features = ["use_std"]
-
-[workspace.dependencies.tikv-jemalloc-sys]
-git = "https://github.com/matrix-construct/jemallocator"
-rev = "03bed96afbbc898bef4d4f7d335c0519e3d1afad"
-default-features = false
-features = [
-	"background_threads_runtime_support",
-	"unprefixed_malloc_on_supported_platforms",
-]
-
 [workspace.dependencies.tokio]
-version = "1.47"
+version = "1.48"
 default-features = false
 features = [
 	"fs",
@@ -540,7 +531,7 @@ features = [
 ]
 
 [workspace.dependencies.tracing]
-version = "0.1"
+version = "=0.1.43"
 default-features = false
 
 [workspace.dependencies.tracing-core]
@@ -551,7 +542,7 @@ default-features = false
 version = "0.2"
 
 [workspace.dependencies.tracing-opentelemetry]
-version = "0.31"
+version = "0.32"
 
 [workspace.dependencies.tracing-subscriber]
 version = "0.3"
@@ -709,8 +700,8 @@ strip = "symbols"
 debug = false
 
 [profile.bench]
-debug = false
-strip = false
+debug = "limited"
+strip = "none"
 #rustflags = [
 #	"-Cremark=all",
 #	'-Ztime-passes',
@@ -1005,6 +996,7 @@ assertions_on_constants = { level = "allow", priority = 1 }
 module_inception = { level = "allow", priority = 1 }
 obfuscated_if_else = { level = "allow", priority = 1 }
 collapsible_if = { level = "allow", priority = 1 }                   # TODO stable v. nightly 05-21-25
+toplevel-ref-arg = { level = "allow", priority = 1 }
 
 ###################
 suspicious = { level = "warn", priority = -1 }

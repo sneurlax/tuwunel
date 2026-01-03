@@ -1,5 +1,7 @@
+mod append;
 mod namespace_regex;
 mod registration_info;
+pub(crate) mod request;
 
 use std::{
 	collections::{BTreeMap, HashSet},

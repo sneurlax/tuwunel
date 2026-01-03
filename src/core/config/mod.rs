@@ -3,7 +3,8 @@ pub mod manager;
 pub mod proxy;
 
 use std::{
-	collections::{BTreeMap, BTreeSet},
+	collections::{BTreeMap, BTreeSet, HashSet},
+	hash::{Hash, Hasher},
 	net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
 	path::{Path, PathBuf},
 };
@@ -16,7 +17,7 @@ use figment::providers::{Env, Format, Toml};
 pub use figment::{Figment, value::Value as FigmentValue};
 use regex::RegexSet;
 use ruma::{
-	OwnedRoomOrAliasId, OwnedServerName, OwnedUserId, RoomVersionId,
+	OwnedMxcUri, OwnedRoomOrAliasId, OwnedServerName, OwnedUserId, RoomVersionId,
 	api::client::discovery::discover_support::ContactRole,
 };
 use serde::{Deserialize, de::IgnoredAny};
@@ -28,6 +29,7 @@ pub use self::{check::check, manager::Manager};
 use crate::{
 	Result, err,
 	error::Error,
+	utils,
 	utils::{string::EMPTY, sys},
 };
 
@@ -57,7 +59,7 @@ use crate::{
 ### https://tuwunel.chat/configuration.html
 "#,
 	ignore = "catchall well_known tls blurhashing allow_invalid_tls_certificates ldap jwt \
-	          appservice"
+	          appservice identity_provider"
 )]
 pub struct Config {
 	/// The server_name is the pretty name of this server. It is used as a
@@ -590,6 +592,17 @@ pub struct Config {
 	#[serde(default = "true_fn")]
 	pub allow_encryption: bool,
 
+	/// Controls whether locally-created rooms should be end-to-end encrypted by
+	/// default. This option is equivalent to the one found in Synapse.
+	///
+	/// Options:
+	/// - "all": All created rooms are encrypted.
+	/// - "invite": Any room created with `private_chat` or
+	///   `trusted_private_chat` presets.
+	/// - Other values default to no effect.
+	#[serde(default)]
+	pub encryption_enabled_by_default_for_room_type: Option<String>,
+
 	/// Controls whether federation is allowed or not. It is not recommended to
 	/// disable this after installation due to potential federation breakage but
 	/// this is technically not a permanent setting.
@@ -901,6 +914,26 @@ pub struct Config {
 	#[serde(default)]
 	pub log_to_stderr: bool,
 
+	/// Setting to false disables the logging/tracing system at a lower level.
+	/// In contrast to configuring an empty `log` string where the system is
+	/// still operating but muted, when this option is false the system was not
+	/// initialized and is not operating. Changing this option has no effect
+	/// after startup. This option is intended for developers and expert use
+	/// only: configuring an empty log string is preferred over using this.
+	///
+	/// default: true
+	#[serde(default = "true_fn")]
+	pub log_enable: bool,
+
+	/// Setting to false disables the logging/tracing system at a lower level
+	/// similar to `log_enable`. In this case the system is configured normally,
+	/// but not registered as the global handler in the final steps. This option
+	/// is for developers and expert use only.
+	///
+	/// default: true
+	#[serde(default = "true_fn")]
+	pub log_global_default: bool,
+
 	/// OpenID token expiration/TTL in seconds.
 	///
 	/// These are the OpenID tokens that are primarily used for Matrix account
@@ -975,7 +1008,7 @@ pub struct Config {
 	///
 	/// display: sensitive
 	#[serde(default)]
-	pub turn_secret: String,
+	pub turn_secret: Option<String>,
 
 	/// TURN secret to use that's read from the file path specified.
 	///
@@ -1277,26 +1310,28 @@ pub struct Config {
 	#[serde(default = "default_rocksdb_stats_level")]
 	pub rocksdb_stats_level: u8,
 
-	/// Erases data no longer reachable in the current schema. The developers
-	/// expect this to be set to true which simplifies the schema and prevents
-	/// accumulation of old schemas remaining in the codebase forever. If this
-	/// is set to false, old columns which are not described in the current
-	/// schema will be ignored rather than erased, leaking their space.
+	/// Ignores the list of dropped columns set by developers.
 	///
-	/// This can be set to false when moving between versions in ways which are
-	/// not recommended or otherwise forbidden, or for diagnostic and
-	/// development purposes; requiring preservation across such movements.
+	/// This should be set to true when knowingly moving between versions in
+	/// ways which are not recommended or otherwise forbidden, or for
+	/// diagnostic and development purposes; requiring preservation across such
+	/// movements.
 	///
-	/// default: true
-	#[serde(default = "true_fn")]
-	pub rocksdb_drop_missing_columns: bool,
+	/// The developer's list of dropped columns is meant to safely reduce space
+	/// by erasing data no longer in use. If this is set to true that storage
+	/// will not be reclaimed as intended.
+	///
+	/// default: false
+	#[serde(default)]
+	pub rocksdb_never_drop_columns: bool,
 
 	/// This is a password that can be configured that will let you login to the
 	/// server bot account (currently `@conduit`) for emergency troubleshooting
 	/// purposes such as recovering/recreating your admin room, or inviting
 	/// yourself back.
 	///
-	/// See https://tuwunel.chat/troubleshooting.html#lost-access-to-admin-room for other ways to get back into your admin room.
+	/// See https://tuwunel.chat/troubleshooting.html#lost-access-to-admin-room
+	/// for other ways to get back into your admin room.
 	///
 	/// Once this password is unset, all sessions will be logged out for
 	/// security purposes.
@@ -1309,6 +1344,30 @@ pub struct Config {
 	/// default: "/_matrix/push/v1/notify"
 	#[serde(default = "default_notification_push_path")]
 	pub notification_push_path: String,
+
+	/// For compatibility and special purpose use only. Setting this option to
+	/// true will not filter messages sent to pushers based on rules or actions.
+	/// Everything will be sent to the pusher. This option is offered for
+	/// several reasons, but should not be necessary:
+	/// - Bypass to workaround bugs or outdated server-side ruleset support.
+	/// - Allow clients to evaluate pushrules themselves (due to the above).
+	/// - Hosting or companies which have custom pushers and internal needs.
+	///
+	/// Note that setting this option to true will not affect the record of
+	/// notifications found in the notifications pane.
+	#[serde(default)]
+	pub push_everything: bool,
+
+	/// Setting to false disables the heroes calculation made by sliding and
+	/// legacy client sync. The heroes calculation is mandated by the Matrix
+	/// specification and your client may not operate properly unless this
+	/// option is set to true.
+	///
+	/// This option is intended for custom software deployments seeking purely
+	/// to minimize unused resources; the overall savings are otherwise
+	/// negligible.
+	#[serde(default = "true_fn")]
+	pub calculate_heroes: bool,
 
 	/// Allow local (your server only) presence updates/requests.
 	///
@@ -1700,6 +1759,26 @@ pub struct Config {
 	)]
 	pub deprioritize_joins_through_servers: RegexSet,
 
+	/// Maximum make_join requests to attempt within each join attempt. Each
+	/// attempt tries a different server, as each server is only tried once;
+	/// though retries can occur when the join request as a whole is retried.
+	///
+	/// default: 48
+	#[serde(default = "default_max_make_join_attempts_per_join_attempt")]
+	pub max_make_join_attempts_per_join_attempt: usize,
+
+	/// Maximum join attempts to conduct per client join request. Each join
+	/// attempt consists of one or more make_join requests limited above, and a
+	/// single send_join request. This value allows for additional servers to
+	/// act as the join-server prior to reporting the last error back to the
+	/// client, which can be frustrating for users. Therefor the default value
+	/// is greater than one, but less than excessively exceeding the client's
+	/// request timeout, though that may not be avoidable in some cases.
+	///
+	/// default: 3
+	#[serde(default = "default_max_join_attempts_per_join_request")]
+	pub max_join_attempts_per_join_request: usize,
+
 	/// Retry failed and incomplete messages to remote servers immediately upon
 	/// startup. This is called bursting. If this is disabled, said messages may
 	/// not be delivered until more messages are queued for that server. Do not
@@ -2007,6 +2086,17 @@ pub struct Config {
 	#[serde(default)]
 	pub allow_invalid_tls_certificates: bool,
 
+	/// Sets the `Access-Control-Allow-Origin` header included by this server in
+	/// all responses. A list of multiple values can be specified. The default
+	/// is an empty list. The actual header defaults to `*` upon an empty list.
+	///
+	/// There is no reason to configure this without specific intent. Incorrect
+	/// values may degrade or disrupt clients.
+	///
+	/// default: []
+	#[serde(default)]
+	pub access_control_allow_origin: BTreeSet<String>,
+
 	/// Backport state-reset security fixes to all room versions.
 	///
 	/// This option applies the State Resolution 2.1 mitigation developed during
@@ -2023,11 +2113,6 @@ pub struct Config {
 	///
 	/// This option exists for developer and debug use, and as a failsafe in
 	/// lieu of hardcoding it.
-	///
-	/// This currently defaults to false as a matter of development until
-	/// real-world testing can shake out any implementation issues rather than
-	/// jeopardize existing rooms, but otherwise will default to true at the
-	/// next point release or patch.
 	#[serde(default = "true_fn")]
 	pub hydra_backports: bool,
 
@@ -2069,6 +2154,13 @@ pub struct Config {
 	// external structure; separate section
 	#[serde(default)]
 	pub appservice: BTreeMap<String, AppService>,
+
+	// external structure; separate sections
+	#[serde(default)]
+	pub identity_provider: HashSet<IdentityProvider>,
+
+	#[serde(default)]
+	pub sso_aware_preferred: bool,
 
 	#[serde(flatten)]
 	#[allow(clippy::zero_sized_map_values)]
@@ -2134,6 +2226,28 @@ pub struct WellKnownConfig {
 	///
 	/// example "@admin:example.com"
 	pub support_mxid: Option<OwnedUserId>,
+
+	/// Element Call / MatrixRTC configuration (MSC4143).
+	/// Configures the LiveKit SFU server for voice/video calls.
+	///
+	/// Requires a LiveKit server with JWT authentication.
+	/// The `livekit_service_url` should point to your LiveKit JWT endpoint.
+	///
+	/// Note: You must also set `client` above to your homeserver URL.
+	///
+	/// Example:
+	/// ```toml
+	/// [global.well_known]
+	/// client = "https://matrix.yourdomain.com"
+	///
+	/// [[global.well_known.rtc_transports]]
+	/// type = "livekit"
+	/// livekit_service_url = "https://livekit.yourdomain.com"
+	/// ```
+	///
+	/// default: []
+	#[serde(default)]
+	pub rtc_transports: Vec<serde_json::Value>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Default)]
@@ -2361,6 +2475,134 @@ pub struct JwtConfig {
 	/// default: true
 	#[serde(default = "true_fn")]
 	pub validate_signature: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[config_example_generator(
+	filename = "tuwunel-example.toml",
+	section = "[global.identity_provider]"
+)]
+pub struct IdentityProvider {
+	/// The brand-name of the service (e.g. Apple, Facebook, GitHub, GitLab,
+	/// Google) or the software (e.g. keycloak, MAS) providing the identity.
+	/// When a brand is recognized we apply certain defaults to this config
+	/// for your convenience. For certain brands we apply essential internal
+	/// workarounds specific to that provider; it is important to configure this
+	/// field properly when a provider needs to be recognized (like GitHub for
+	/// example). Several configured providers can share the same brand name. It
+	/// is not case-sensitive.
+	#[serde(deserialize_with = "utils::string::de::to_lowercase")]
+	pub brand: String,
+
+	/// The ID of your OAuth application which the provider generates upon
+	/// registration. This ID then uniquely identifies this configuration
+	/// instance itself, becoming the identity provider's ID and must be unique
+	/// and remain unchanged.
+	pub client_id: String,
+
+	/// Secret key the provider generated for you along with the `client_id`
+	/// above. Unlike the `client_id`, the `client_secret` can be changed here
+	/// whenever the provider regenerates one for you.
+	pub client_secret: String,
+
+	/// The callback URL configured when registering the OAuth application with
+	/// the provider. Tuwunel's callback URL must be strictly formatted exactly
+	/// as instructed. The URL host must point directly at the matrix server and
+	/// use the following path:
+	/// `/_matrix/client/unstable/login/sso/callback/<client_id>` where
+	/// `<client_id>` is the same one configured for this provider above.
+	pub callback_url: Option<Url>,
+
+	/// Optional display-name for this provider instance seen on the login page
+	/// by users. It defaults to `brand`. When configuring multiple providers
+	/// using the same `brand` this can be set to distinguish them.
+	pub name: Option<String>,
+
+	/// Optional icon for the provider. The canonical providers have a default
+	/// icon based on the `brand` supplied above when this is not supplied. Note
+	/// that it uses an MXC url which is curious in the auth-media era and may
+	/// not be reliable.
+	pub icon: Option<OwnedMxcUri>,
+
+	/// Optional list of scopes to authorize. An empty array does not impose any
+	/// restrictions from here, effectively defaulting to all scopes you
+	/// configured for the OAuth application at the provider. This setting
+	/// allows for restricting to a subset of those scopes for this instance.
+	/// Note the user can further restrict scopes during their authorization.
+	///
+	/// default: []
+	#[serde(default)]
+	pub scope: BTreeSet<String>,
+
+	/// List of userinfo claims which shape and restrict the way we compute a
+	/// Matrix UserId for new registrations. Reviewing Tuwunel's documentation
+	/// will be necessary for a complete description in detail. An empty array
+	/// imposes no restriction here, avoiding generated fallbacks as much as
+	/// possible. For simplicity we reserve a claim called "unique" which can be
+	/// listed alone to ensure *only* generated ID's are used for registrations.
+	///
+	/// default: []
+	#[serde(default)]
+	pub userid_claims: BTreeSet<String>,
+
+	/// Issuer URL the provider publishes for you. We have pre-supplied default
+	/// values for some of the canonical providers, making this field optional
+	/// based on the `brand` set above. Otherwise it is required for OIDC
+	/// discovery to acquire additional provider configuration, and it must be
+	/// correct to pass validations during various interactions.
+	pub issuer_url: Option<Url>,
+
+	/// Extra path components after the issuer_url leading to the location of
+	/// the `.well-known` directory used for discovery. This will be empty for
+	/// specification-compliant providers. We have supplied any known values
+	/// based on `brand` (e.g. `/login/oauth` for GitHub).
+	pub base_path: Option<String>,
+
+	/// Overrides the `.well-known` location where the provider's OIDC
+	/// configuration is found. It is very unlikely you will need to set this;
+	/// available for developers or special purposes only.
+	pub discovery_url: Option<Url>,
+
+	/// Overrides the authorize URL requested during the grant phase. This is
+	/// generally discovered or derived automatically, but may be required as a
+	/// workaround for any non-standard or undiscoverable provider.
+	pub authorization_url: Option<Url>,
+
+	/// Overrides the access token URL; the same caveats apply as with the other
+	/// URL overrides.
+	pub token_url: Option<Url>,
+
+	/// Overrides the revocation URL; the same caveats apply as with the other
+	/// URL overrides.
+	pub revocation_url: Option<Url>,
+
+	/// Overrides the introspection URL; the same caveats apply as with the
+	/// other URL overrides.
+	pub introspection_url: Option<Url>,
+
+	/// Overrides the userinfo URL; the same caveats apply as with the other URL
+	/// overrides.
+	pub userinfo_url: Option<Url>,
+
+	/// Whether to perform discovery and adjust this provider's configuration
+	/// accordingly. This defaults to true. When true, it is an error when
+	/// discovery fails and authorizations will not be attempted to the
+	/// provider.
+	#[serde(default = "true_fn")]
+	pub discovery: bool,
+
+	/// The duration in seconds before a grant authorization session expires.
+	#[serde(default = "default_sso_grant_session_duration")]
+	pub grant_session_duration: Option<u64>,
+}
+
+impl IdentityProvider {
+	#[must_use]
+	pub fn id(&self) -> &str { self.client_id.as_str() }
+}
+
+impl Hash for IdentityProvider {
+	fn hash<H: Hasher>(&self, state: &mut H) { self.id().hash(state) }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -2907,3 +3149,9 @@ fn default_deprioritize_joins_through_servers() -> RegexSet {
 }
 
 fn default_one_time_key_limit() -> usize { 256 }
+
+fn default_max_make_join_attempts_per_join_attempt() -> usize { 48 }
+
+fn default_max_join_attempts_per_join_request() -> usize { 3 }
+
+fn default_sso_grant_session_duration() -> Option<u64> { Some(180) }

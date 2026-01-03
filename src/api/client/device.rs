@@ -2,14 +2,14 @@ use axum::extract::State;
 use axum_client_ip::InsecureClientIp;
 use futures::StreamExt;
 use ruma::{
-	MilliSecondsSinceUnixEpoch, OwnedDeviceId,
+	MilliSecondsSinceUnixEpoch,
 	api::client::device::{
 		self, delete_device, delete_devices, get_device, get_devices, update_device,
 	},
 };
-use tuwunel_core::{Err, Result, debug, err, utils};
+use tuwunel_core::{Err, Result, debug, err, utils::string::to_small_string};
 
-use crate::{Ruma, client::DEVICE_ID_LENGTH, router::auth_uiaa};
+use crate::{Ruma, router::auth_uiaa};
 
 /// # `GET /_matrix/client/r0/devices`
 ///
@@ -61,18 +61,21 @@ pub(crate) async fn update_device_route(
 		.await
 	{
 		| Ok(mut device) => {
+			let notify = device.display_name != body.display_name;
 			device.display_name.clone_from(&body.display_name);
+
 			device
 				.last_seen_ip
-				.clone_from(&Some(client.to_string()));
+				.clone_from(&Some(to_small_string(client)));
+
 			device
 				.last_seen_ts
 				.clone_from(&Some(MilliSecondsSinceUnixEpoch::now()));
 
+			assert_eq!(device.device_id, body.device_id, "device_id mismatch");
 			services
 				.users
-				.update_device_metadata(sender_user, &body.device_id, &device)
-				.await?;
+				.put_device_metadata(sender_user, notify, &device);
 
 			Ok(update_device::v3::Response {})
 		},
@@ -80,6 +83,7 @@ pub(crate) async fn update_device_route(
 			let Some(appservice) = appservice else {
 				return Err!(Request(NotFound("Device not found.")));
 			};
+
 			if !appservice.registration.device_management {
 				return Err!(Request(NotFound("Device not found.")));
 			}
@@ -90,14 +94,12 @@ pub(crate) async fn update_device_route(
 				appservice.registration.id
 			);
 
-			let device_id = OwnedDeviceId::from(utils::random_string(DEVICE_ID_LENGTH));
-
 			services
 				.users
 				.create_device(
 					sender_user,
-					&device_id,
-					(&appservice.registration.as_token, None),
+					None,
+					(Some(&appservice.registration.as_token), None),
 					None,
 					None,
 					Some(client.to_string()),

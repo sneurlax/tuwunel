@@ -8,11 +8,12 @@ use axum_client_ip::SecureClientIpSource;
 use http::{
 	HeaderValue, Method, StatusCode,
 	header::{self, HeaderName},
+	uri::PathAndQuery,
 };
 use tower::ServiceBuilder;
 use tower_http::{
 	catch_panic::CatchPanicLayer,
-	cors::{self, CorsLayer},
+	cors::{AllowOrigin, CorsLayer},
 	sensitive_headers::SetSensitiveHeadersLayer,
 	set_header::SetResponseHeaderLayer,
 	timeout::{RequestBodyTimeoutLayer, ResponseBodyTimeoutLayer, TimeoutLayer},
@@ -67,9 +68,13 @@ pub(crate) fn build(services: &Arc<Services>) -> Result<(Router, Guard)> {
 		.layer(RequestBodyTimeoutLayer::new(Duration::from_secs(
 			server.config.client_receive_timeout,
 		)))
-		.layer(TimeoutLayer::new(Duration::from_secs(server.config.client_request_timeout)))
+		.layer(TimeoutLayer::with_status_code(
+			StatusCode::REQUEST_TIMEOUT,
+			Duration::from_secs(server.config.client_request_timeout),
+		))
 		.layer(SetResponseHeaderLayer::if_not_present(
-			HeaderName::from_static("origin-agent-cluster"), // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin-Agent-Cluster
+			// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin-Agent-Cluster
+			HeaderName::from_static("origin-agent-cluster"),
 			HeaderValue::from_static("?1"),
 		))
 		.layer(SetResponseHeaderLayer::if_not_present(
@@ -138,30 +143,48 @@ fn compression_layer(server: &Server) -> tower_http::compression::CompressionLay
 	compression_layer
 }
 
-fn cors_layer(_server: &Server) -> CorsLayer {
+fn cors_layer(server: &Server) -> CorsLayer {
 	const METHODS: [Method; 7] = [
+		Method::DELETE,
 		Method::GET,
 		Method::HEAD,
+		Method::OPTIONS,
 		Method::PATCH,
 		Method::POST,
 		Method::PUT,
-		Method::DELETE,
-		Method::OPTIONS,
 	];
 
 	let headers: [HeaderName; 5] = [
-		header::ORIGIN,
-		HeaderName::from_lowercase(b"x-requested-with").unwrap(),
-		header::CONTENT_TYPE,
 		header::ACCEPT,
 		header::AUTHORIZATION,
+		header::CONTENT_TYPE,
+		header::ORIGIN,
+		HeaderName::from_lowercase(b"x-requested-with").unwrap(),
 	];
 
+	let allow_origin_list = server
+		.config
+		.access_control_allow_origin
+		.iter()
+		.map(AsRef::as_ref)
+		.map(HeaderValue::from_str)
+		.filter_map(Result::ok);
+
+	let allow_origin = if !server
+		.config
+		.access_control_allow_origin
+		.is_empty()
+	{
+		AllowOrigin::list(allow_origin_list)
+	} else {
+		AllowOrigin::any()
+	};
+
 	CorsLayer::new()
-		.allow_origin(cors::Any)
+		.max_age(Duration::from_secs(86400))
 		.allow_methods(METHODS)
 		.allow_headers(headers)
-		.max_age(Duration::from_secs(86400))
+		.allow_origin(allow_origin)
 }
 
 fn body_limit_layer(server: &Server) -> DefaultBodyLimit {
@@ -221,8 +244,8 @@ fn request_path_str<T>(request: &http::Request<T>) -> &str {
 	request
 		.uri()
 		.path_and_query()
-		.expect("all requests have a path")
-		.as_str()
+		.map(PathAndQuery::as_str)
+		.unwrap_or("/")
 }
 
 fn truncated_matched_path(path: &MatchedPath) -> &str {

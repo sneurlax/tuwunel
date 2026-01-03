@@ -16,6 +16,7 @@ pub(super) fn open(engine: &Arc<Engine>) -> Result<Maps> { open_list(engine, MAP
 #[tracing::instrument(name = "maps", level = "debug", skip_all)]
 pub(super) fn open_list(engine: &Arc<Engine>, maps: &[Descriptor]) -> Result<Maps> {
 	maps.iter()
+		.filter(|desc| !desc.dropped)
 		.map(|desc| Ok((desc.name, Map::open(engine, desc.name)?)))
 		.collect()
 }
@@ -113,6 +114,14 @@ pub(super) static MAPS: &[Descriptor] = &[
 		..descriptor::RANDOM_SMALL
 	},
 	Descriptor {
+		name: "oauthid_session",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
+		name: "oauthuniqid_oauthid",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
 		name: "onetimekeyid_onetimekeys",
 		..descriptor::RANDOM_SMALL
 	},
@@ -166,6 +175,10 @@ pub(super) static MAPS: &[Descriptor] = &[
 		..descriptor::RANDOM_SMALL
 	},
 	Descriptor {
+		name: "roomid_maxremotepowerlevel",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
 		name: "roomid_pduleaves",
 		..descriptor::RANDOM_SMALL
 	},
@@ -182,6 +195,10 @@ pub(super) static MAPS: &[Descriptor] = &[
 	Descriptor {
 		name: "roomserverids",
 		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
+		name: "roomsynctoken_shortstatehash",
+		..descriptor::DROPPED
 	},
 	Descriptor {
 		name: "roomuserdataid_accountdata",
@@ -375,6 +392,10 @@ pub(super) static MAPS: &[Descriptor] = &[
 		..descriptor::RANDOM_SMALL
 	},
 	Descriptor {
+		name: "userid_dehydrateddevice",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
 		name: "userid_devicelistversion",
 		..descriptor::RANDOM_SMALL
 	},
@@ -388,6 +409,10 @@ pub(super) static MAPS: &[Descriptor] = &[
 	},
 	Descriptor {
 		name: "userid_masterkeyid",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
+		name: "userid_oauthid",
 		..descriptor::RANDOM_SMALL
 	},
 	Descriptor {
@@ -409,6 +434,11 @@ pub(super) static MAPS: &[Descriptor] = &[
 	Descriptor {
 		name: "userid_usersigningkeyid",
 		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
+		name: "useridcount_notification",
+		limit_size: 1024 * 1024 * 256,
+		..descriptor::RANDOM_SMALL_CACHE
 	},
 	Descriptor {
 		name: "useridprofilekey_value",
@@ -437,9 +467,5 @@ pub(super) static MAPS: &[Descriptor] = &[
 	Descriptor {
 		name: "userroomid_notificationcount",
 		..descriptor::RANDOM
-	},
-	Descriptor {
-		name: "roomid_maxremotepowerlevel",
-		..descriptor::RANDOM_SMALL
 	},
 ];

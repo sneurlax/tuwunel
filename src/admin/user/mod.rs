@@ -1,7 +1,7 @@
 mod commands;
 
 use clap::Subcommand;
-use ruma::{OwnedEventId, OwnedRoomId, OwnedRoomOrAliasId};
+use ruma::{OwnedDeviceId, OwnedEventId, OwnedRoomId, OwnedRoomOrAliasId, OwnedUserId};
 use tuwunel_core::Result;
 
 use crate::admin_command_dispatch;
@@ -59,6 +59,12 @@ pub(super) enum UserCommand {
 		force: bool,
 	},
 
+	/// - Deletes a user's device.
+	DeleteDevice {
+		user_id: OwnedUserId,
+		device_id: OwnedDeviceId,
+	},
+
 	/// - List local users in the database
 	#[clap(alias = "list")]
 	ListUsers,
@@ -72,7 +78,7 @@ pub(super) enum UserCommand {
 	/// - Manually join a local user to a room.
 	ForceJoinRoom {
 		user_id: String,
-		room_id: OwnedRoomOrAliasId,
+		room: OwnedRoomOrAliasId,
 	},
 
 	/// - Manually leave a local user from a room.
@@ -142,7 +148,7 @@ pub(super) enum UserCommand {
 	///
 	/// Requires the `--yes-i-want-to-do-this` flag.
 	ForceJoinListOfLocalUsers {
-		room_id: OwnedRoomOrAliasId,
+		room: OwnedRoomOrAliasId,
 
 		#[arg(long)]
 		yes_i_want_to_do_this: bool,
@@ -154,7 +160,7 @@ pub(super) enum UserCommand {
 	///
 	/// Requires the `--yes-i-want-to-do-this` flag.
 	ForceJoinAllLocalUsers {
-		room_id: OwnedRoomOrAliasId,
+		room: OwnedRoomOrAliasId,
 
 		#[arg(long)]
 		yes_i_want_to_do_this: bool,

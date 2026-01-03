@@ -109,10 +109,10 @@ impl Service {
 	pub async fn maybe_resolve_with_servers(
 		&self,
 		room: &RoomOrAliasId,
-		servers: Option<Vec<OwnedServerName>>,
+		servers: Option<&[OwnedServerName]>,
 	) -> Result<(OwnedRoomId, Vec<OwnedServerName>)> {
 		match <&RoomId>::try_from(room) {
-			| Ok(room_id) => Ok((room_id.to_owned(), servers.unwrap_or_default())),
+			| Ok(room_id) => Ok((room_id.to_owned(), Vec::from(servers.unwrap_or_default()))),
 			| Err(alias) => self.resolve_alias(alias).await,
 		}
 	}
@@ -151,8 +151,8 @@ impl Service {
 
 		let response = self
 			.services
-			.sending
-			.send_federation_request(server, request)
+			.federation
+			.execute(server, request)
 			.await?;
 
 		Ok((response.room_id, response.servers))
@@ -257,8 +257,8 @@ impl Service {
 			if appservice.aliases.is_match(room_alias.as_str())
 				&& matches!(
 					self.services
-						.sending
-						.send_appservice_request(
+						.appservice
+						.send_request(
 							appservice.registration.clone(),
 							query_room_alias::v1::Request { room_alias: room_alias.to_owned() },
 						)

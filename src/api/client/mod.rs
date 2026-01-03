@@ -5,8 +5,10 @@ pub(super) mod appservice;
 pub(super) mod backup;
 pub(super) mod capabilities;
 pub(super) mod context;
+pub(super) mod dehydrated_device;
 pub(super) mod device;
 pub(super) mod directory;
+pub(super) mod events;
 pub(super) mod filter;
 pub(super) mod keys;
 pub(super) mod media;
@@ -49,8 +51,10 @@ pub(super) use appservice::*;
 pub(super) use backup::*;
 pub(super) use capabilities::*;
 pub(super) use context::*;
+pub(super) use dehydrated_device::*;
 pub(super) use device::*;
 pub(super) use directory::*;
+pub(super) use events::*;
 pub(super) use filter::*;
 pub(super) use keys::*;
 pub(super) use media::*;
@@ -83,9 +87,6 @@ pub(super) use unversioned::*;
 pub(super) use user_directory::*;
 pub(super) use voip::*;
 pub(super) use well_known::*;
-
-/// generated device ID length
-const DEVICE_ID_LENGTH: usize = 10;
 
 /// generated user access token length
 const TOKEN_LENGTH: usize = tuwunel_service::users::device::TOKEN_LENGTH;

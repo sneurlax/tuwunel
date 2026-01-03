@@ -1,4 +1,4 @@
-variable "CI" {}
+
 variable "GITHUB_ACTOR" {}
 variable "GITHUB_REPOSITORY" {}
 variable "GITHUB_REF" {}
@@ -83,6 +83,9 @@ variable "rocksdb_build_type" {
 }
 variable "rocksdb_make_verbose" {
     default = "ON"
+}
+variable "rocksdb_numa" {
+    default = "0"
 }
 
 # Complement options
@@ -247,7 +250,7 @@ group "tests" {
 group "matrix-compliance" {
     targets = [
         "complement",
-        "matrix-rust-sdk-integration",
+        "rust-sdk-integ",
     ]
 }
 
@@ -440,61 +443,96 @@ target "complement-config" {
 # Integration tests
 #
 
-group "integrations" {
+group "integration" {
     targets = [
-        "matrix-rust-sdk-integration",
-        "integration",
+        "integ",
+        "rust-sdk-integ",
     ]
 }
 
-target "matrix-rust-sdk-integration" {
-    name = elem("matrix-rust-sdk-integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+variable "valgrind_flags" {
+    default = "--error-exitcode=1 --exit-on-first-error=yes --undef-value-errors=no --leak-check=no"
+}
+
+target "rust-sdk-valgrind" {
+    name = elem("rust-sdk-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     tags = [
-        elem_tag("matrix-rust-sdk-integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
+        elem_tag("rust-sdk-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
     ]
-    output = ["type=docker,compression=zstd,mode=max,compression-level=${zstd_image_compress_level}"]
-    cache_to = ["type=local,compression=zstd,mode=max,compression-level=${cache_compress_level}"]
-    target = "matrix-rust-sdk-integration"
-    dockerfile = "${docker_dir}/Dockerfile.matrix-rust-sdk"
     matrix = cargo_rust_feat_sys
     inherits = [
-        elem("rust", [rust_toolchain, rust_target, sys_name, sys_version, sys_target])
+        elem("rust-sdk-integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     ]
     contexts = {
         input = elem("target:rust", [rust_toolchain, rust_target, sys_name, sys_version, sys_target])
         install = elem("target:install", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     }
     args = {
-        mrsdk_test_args=""
-        mrsdk_test_opts=""
+        VALGRINDFLAGS = "${valgrind_flags}"
+        mrsdk_testee = "valgrind ${valgrind_flags} /usr/bin/tuwunel"
+        mrsdk_test_args = ""
+        mrsdk_startup_delay = "30s"
+        mrsdk_skip_list =<<EOF
+            --skip test_delayed_invite_response_and_sent_message_decryption
+            --skip test_history_share_on_invite_pin_violation
+EOF
     }
 }
 
-target "integration-valgrind" {
-    name = elem("integration-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+target "rust-sdk-integ" {
+    name = elem("rust-sdk-integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     tags = [
-        elem_tag("integration-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
+        elem_tag("rust-sdk-integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
+    ]
+    output = ["type=docker,compression=zstd,mode=max,compression-level=${zstd_image_compress_level}"]
+    cache_to = ["type=local,compression=zstd,mode=max,compression-level=${cache_compress_level}"]
+    target = "rust-sdk-integration"
+    dockerfile = "${docker_dir}/Dockerfile.matrix-rust-sdk"
+    matrix = cargo_rust_feat_sys
+    inherits = [
+        elem("rust", [rust_toolchain, rust_target, sys_name, sys_version, sys_target]),
+        elem("integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
+    ]
+    contexts = {
+        input = elem("target:rust", [rust_toolchain, rust_target, sys_name, sys_version, sys_target])
+        install = elem("target:install", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+    }
+    args = {
+        mrsdk_target_share = "/usr/src/matrix-rust-sdk/target/${sys_name}/${sys_version}/${rust_target}/${rust_toolchain}/_shared_cache"
+
+        mrsdk_testee = "/usr/bin/tuwunel"
+        mrsdk_test_args = "--no-fail-fast"
+
+        mrsdk_skip_list =<<EOF
+            --skip test_delayed_invite_response_and_sent_message_decryption
+EOF
+    }
+}
+
+target "integ-valgrind" {
+    name = elem("integ-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+    tags = [
+        elem_tag("integ-valgrind", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
     ]
     matrix = cargo_rust_feat_sys
     inherits = [
-        elem("integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
+        elem("integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
     ]
     contexts = {
-        input = elem("target:integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+        input = elem("target:build-tests", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     }
     args = {
-        VALGRINDFLAGS = "--error-exitcode=1 --exit-on-first-error=yes --undef-value-errors=no --leak-check=no"
+        VALGRINDFLAGS = "${valgrind_flags}"
         cargo_cmd = "valgrind test"
         cargo_args = "--test=*"
     }
 }
 
-target "integration" {
-    name = elem("integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
+target "integ" {
+    name = elem("integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     tags = [
-        elem_tag("integration", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
+        elem_tag("integ", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
     ]
-    target = "cargo"
     matrix = cargo_rust_feat_sys
     inherits = [
         elem("build-tests", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
@@ -504,7 +542,6 @@ target "integration" {
     }
     args = {
         TUWUNEL_DATABASE_PATH = "/tmp/integration.test.db"
-
         cargo_cmd = (cargo_profile == "bench"? "bench": "test")
         cargo_args = (cargo_profile == "bench"?
             "--no-fail-fast --bench=*": "--no-fail-fast --test=*"
@@ -527,16 +564,16 @@ group "smoke" {
 }
 
 target "smoke-nix" {
-    name = elem("smoke-nix", [sys_name, sys_version, sys_target])
+    name = elem("smoke-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     tags = [
-        elem_tag("smoke-nix", [sys_name, sys_version, sys_target], "latest"),
+        elem_tag("smoke-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
     ]
     output = ["type=cacheonly,compression=zstd,mode=min,compression-level=${cache_compress_level}"]
     dockerfile = "${docker_dir}/Dockerfile.nix"
     target = "smoke-nix"
-    matrix = sys
+    matrix = cargo_rust_feat_sys
     inherits = [
-        elem("build-nix", [sys_name, sys_version, sys_target]),
+        elem("build-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
     ]
 }
 
@@ -630,7 +667,7 @@ target "unit-valgrind" {
         input = elem("target:unit", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     }
     args = {
-        VALGRINDFLAGS = "--error-exitcode=1 --exit-on-first-error=yes --undef-value-errors=no --leak-check=no"
+        VALGRINDFLAGS = "${valgrind_flags}"
         cargo_cmd = "valgrind test"
         cargo_args = "--lib --bins"
     }
@@ -831,6 +868,12 @@ target "install" {
     }
     args = {
         install_prefix = install_prefix
+        assert_linkage = (
+            substr(cargo_profile, 0, 5) == "bench"?     "static":
+            substr(cargo_profile, 0, 7) == "release"?   "static":
+            substr(rust_toolchain, 0, 6) == "stable"?   "static":
+            ""
+        )
     }
 }
 
@@ -961,20 +1004,20 @@ target "nix" {
     target = "nix-pkg"
     matrix = cargo_rust_feat_sys
     inherits = [
-        elem("build-nix", [sys_name, sys_version, sys_target]),
+        elem("build-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target]),
     ]
 }
 
 target "build-nix" {
-    name = elem("build-nix", [sys_name, sys_version, sys_target])
+    name = elem("build-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target])
     tags = [
-        elem_tag("build-nix", [sys_name, sys_version, sys_target], "latest"),
+        elem_tag("build-nix", [cargo_profile, rust_toolchain, rust_target, feat_set, sys_name, sys_version, sys_target], "latest"),
     ]
     output = ["type=cacheonly,compression=zstd,mode=min,compression-level=${cache_compress_level}"]
     cache_to = ["type=local,compression=zstd,mode=max,compression-level=${cache_compress_level}"]
     dockerfile = "${docker_dir}/Dockerfile.nix"
     target = "build-nix"
-    matrix = sys
+    matrix = cargo_rust_feat_sys
     inherits = [
         elem("builder", [sys_name, sys_version, sys_target]),
         elem("source", [sys_name, sys_version, sys_target]),
@@ -1006,7 +1049,6 @@ target "book" {
     }
     dockerfile-inline =<<EOF
         FROM input AS book
-        COPY --link --from=input . .
         RUN ["mdbook", "build", "-d", "/book", "/usr/src/tuwunel"]
 EOF
 }
@@ -1352,6 +1394,8 @@ target "deps-base" {
         # cache key for unique artifact area
         cargo_target_artifact = "${cargo_tgt_dir_base}/${sys_name}/${sys_version}/${rust_target}/${rust_toolchain}/${cargo_profile}/${feat_set}/${git_ref_sha}"
         # cache key for hashed subdirs
+        cargo_share = "${cargo_tgt_dir_base}/${sys_name}/${sys_version}/${rust_toolchain}/${cargo_profile}/_shared_cache"
+        # cache key for hashed subdirs
         cargo_target_share = "${cargo_tgt_dir_base}/${sys_name}/${sys_version}/${rust_target}/${rust_toolchain}/${cargo_profile}/_shared_cache"
         # cased name of profile subdir within target complex
         cargo_target_profile = (
@@ -1376,7 +1420,7 @@ target "deps-base" {
                     join(" ", static_rustflags),
                     join(" ", static_nightly_rustflags),
                     join(" ", native_rustflags),
-                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/14", #FIXME
+                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/15", #FIXME
                     contains(split(",", cargo_feat_sets[feat_set]), "bzip2_compression")?
                         "-C link-arg=-l:libbz2.a": "",
                     contains(split(",", cargo_feat_sets[feat_set]), "lz4_compression")?
@@ -1390,7 +1434,7 @@ target "deps-base" {
                         "-C link-arg=-l:libgcc.a": "",
                 ]):
 
-            (cargo_profile == "release" || cargo_profile == "bench") && rust_toolchain == "nightly"?
+            (cargo_profile == "release" || cargo_profile == "bench") && substr(rust_toolchain, 0, 7) == "nightly"?
                 join(" ", [
                     join(" ", rustflags),
                     join(" ", nightly_rustflags),
@@ -1398,7 +1442,7 @@ target "deps-base" {
                     join(" ", static_nightly_rustflags),
                     sys_target_triple(sys_target) == "x86_64-linux-gnu"?
                         "-C target-cpu=${sys_target_isa(sys_target)}": "",
-                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/14", #FIXME
+                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/15", #FIXME
                     contains(split(",", cargo_feat_sets[feat_set]), "bzip2_compression")?
                         "-C link-arg=-l:libbz2.a": "",
                     contains(split(",", cargo_feat_sets[feat_set]), "lz4_compression")?
@@ -1418,7 +1462,7 @@ target "deps-base" {
                     join(" ", static_rustflags),
                     sys_target_triple(sys_target) == "x86_64-linux-gnu"?
                         "-C target-cpu=${sys_target_isa(sys_target)}": "",
-                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/14", #FIXME
+                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/15", #FIXME
                     contains(split(",", cargo_feat_sets[feat_set]), "bzip2_compression")?
                         "-C link-arg=-l:libbz2.a": "",
                     contains(split(",", cargo_feat_sets[feat_set]), "lz4_compression")?
@@ -1432,13 +1476,13 @@ target "deps-base" {
                         "-C link-arg=-l:libgcc.a": "",
                 ]):
 
-            rust_toolchain == "stable"?
+            substr(rust_toolchain, 0, 6) == "stable"?
                 join(" ", [
                     join(" ", rustflags),
                     join(" ", static_rustflags),
                     sys_target_triple(sys_target) == "x86_64-linux-gnu"?
                         "-C target-cpu=${sys_target_isa(sys_target)}": "",
-                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/14", #FIXME
+                    "-C link-arg=-L/usr/lib/gcc/${sys_target_triple(sys_target)}/15", #FIXME
                     contains(split(",", cargo_feat_sets[feat_set]), "bzip2_compression")?
                         "-C link-arg=-l:libbz2.a": "",
                     contains(split(",", cargo_feat_sets[feat_set]), "lz4_compression")?
@@ -1452,7 +1496,7 @@ target "deps-base" {
                         "-C link-arg=-l:libgcc.a": "",
                 ]):
 
-            rust_toolchain == "nightly"?
+            substr(rust_toolchain, 0, 7) == "nightly"?
                 join(" ", [
                     join(" ", rustflags),
                     join(" ", nightly_rustflags),
@@ -1517,6 +1561,7 @@ target "rocksdb-build" {
         rocksdb_zstd = contains(split(",", cargo_feat_sets[feat_set]), "zstd_compression")? 1: 0
         rocksdb_jemalloc = contains(split(",", cargo_feat_sets[feat_set]), "jemalloc")? 1: 0
         rocksdb_iouring = contains(split(",", cargo_feat_sets[feat_set]), "io_uring")? 1: 0
+        rocksdb_numa = rocksdb_numa
         rocksdb_shared = 0
         rocksdb_opt_level = rocksdb_opt_level
         rocksdb_build_type = rocksdb_build_type
@@ -1681,7 +1726,7 @@ cargo_installs = [
     "cargo-deb",
     "cargo-generate-rpm",
     "cargo-valgrind",
-    #"lychee",
+    "lychee",
     "mdbook",
     "typos-cli",
 ]
@@ -1770,6 +1815,8 @@ kitchen_packages = [
     "gzip",
     "jq",
     "libc6-dev",
+    "libclang-dev",
+    "libnuma-dev",
     "libssl-dev",
     "libsqlite3-dev",
     "make",

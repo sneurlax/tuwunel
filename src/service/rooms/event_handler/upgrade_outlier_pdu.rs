@@ -28,7 +28,7 @@ pub(super) async fn upgrade_outlier_to_timeline_pdu(
 	val: CanonicalJsonObject,
 	room_version: &RoomVersionId,
 	create_event_id: &EventId,
-) -> Result<Option<RawPduId>> {
+) -> Result<Option<(RawPduId, bool)>> {
 	// Skip the PDU if we already have it as a timeline event
 	if let Ok(pduid) = self
 		.services
@@ -36,7 +36,7 @@ pub(super) async fn upgrade_outlier_to_timeline_pdu(
 		.get_pdu_id(incoming_pdu.event_id())
 		.await
 	{
-		return Ok(Some(pduid));
+		return Ok(Some((pduid, false)));
 	}
 
 	if self
@@ -51,6 +51,8 @@ pub(super) async fn upgrade_outlier_to_timeline_pdu(
 	debug!("Upgrading to timeline pdu");
 	let timer = Instant::now();
 	let room_rules = room_version::rules(room_version)?;
+
+	state_res::check_pdu_format(&val, &room_rules.event_format)?;
 
 	// 10. Fetch missing state and auth chain events by calling /state_ids at
 	//     backwards extremities doing all the checks in this list starting at 1.
@@ -270,5 +272,5 @@ pub(super) async fn upgrade_outlier_to_timeline_pdu(
 		"Accepted",
 	);
 
-	Ok(pdu_id)
+	Ok(pdu_id.zip(Some(true)))
 }

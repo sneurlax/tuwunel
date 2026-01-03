@@ -1,9 +1,14 @@
 use std::collections::HashSet;
 
-use futures::{FutureExt, StreamExt, TryFutureExt, pin_mut};
+use futures::{
+	FutureExt, StreamExt, TryFutureExt,
+	future::{join3, ready},
+	pin_mut,
+};
 use ruma::{
 	CanonicalJsonObject, CanonicalJsonValue, OwnedServerName, RoomId, UserId,
 	api::federation,
+	canonical_json::to_canonical_value,
 	events::{
 		StateEventType,
 		room::member::{MembershipState, RoomMemberEventContent},
@@ -11,9 +16,13 @@ use ruma::{
 };
 use tuwunel_core::{
 	Err, Result, debug_info, debug_warn, err, implement,
-	matrix::PduCount,
+	matrix::{PduCount, room_version},
 	pdu::PduBuilder,
-	utils::{self, FutureBoolExt, future::ReadyEqExt},
+	state_res,
+	utils::{
+		self, FutureBoolExt,
+		future::{ReadyBoolExt, TryExtExt},
+	},
 	warn,
 };
 
@@ -70,21 +79,36 @@ pub async fn leave(
 		return Ok(());
 	}
 
+	let member_event = self
+		.services
+		.state_accessor
+		.room_state_get_content::<RoomMemberEventContent>(
+			room_id,
+			&StateEventType::RoomMember,
+			user_id.as_str(),
+		)
+		.await;
+
 	let dont_have_room = self
 		.services
 		.state_cache
 		.server_in_room(self.services.globals.server_name(), room_id)
-		.eq(&false);
+		.is_false()
+		.and(ready(member_event.as_ref().is_err()));
 
 	let not_knocked = self
 		.services
 		.state_cache
 		.is_knocked(user_id, room_id)
-		.eq(&false);
+		.is_false();
 
 	// Ask a remote server if we don't have this room and are not knocking on it
 	if remote_leave_now || dont_have_room.and(not_knocked).await {
-		if let Err(e) = self.remote_leave(user_id, room_id).boxed().await {
+		if let Err(e) = self
+			.remote_leave(user_id, room_id, reason)
+			.boxed()
+			.await
+		{
 			warn!(%user_id, "Failed to leave room {room_id} remotely: {e}");
 			// Don't tell the client about this error
 		}
@@ -122,16 +146,7 @@ pub async fn leave(
 			)
 			.await?;
 	} else {
-		let Ok(event) = self
-			.services
-			.state_accessor
-			.room_state_get_content::<RoomMemberEventContent>(
-				room_id,
-				&StateEventType::RoomMember,
-				user_id.as_str(),
-			)
-			.await
-		else {
+		let Ok(event) = member_event else {
 			debug_warn!(
 				"Trying to leave a room you are not a member of, marking room as left locally."
 			);
@@ -175,7 +190,12 @@ pub async fn leave(
 
 #[implement(Service)]
 #[tracing::instrument(name = "remote", level = "debug", skip_all)]
-async fn remote_leave(&self, user_id: &UserId, room_id: &RoomId) -> Result {
+async fn remote_leave(
+	&self,
+	user_id: &UserId,
+	room_id: &RoomId,
+	reason: Option<String>,
+) -> Result {
 	let mut make_leave_response_and_server =
 		Err!(BadServerResponse("No remote server available to assist in leaving {room_id}."));
 
@@ -243,14 +263,11 @@ async fn remote_leave(&self, user_id: &UserId, room_id: &RoomId) -> Result {
 	{
 		let make_leave_response = self
 			.services
-			.sending
-			.send_federation_request(
-				&remote_server,
-				federation::membership::prepare_leave_event::v1::Request {
-					room_id: room_id.to_owned(),
-					user_id: user_id.to_owned(),
-				},
-			)
+			.federation
+			.execute(&remote_server, federation::membership::prepare_leave_event::v1::Request {
+				room_id: room_id.to_owned(),
+				user_id: user_id.to_owned(),
+			})
 			.await;
 
 		make_leave_response_and_server = make_leave_response.map(|r| (r, remote_server));
@@ -279,18 +296,37 @@ async fn remote_leave(&self, user_id: &UserId, room_id: &RoomId) -> Result {
 		)));
 	}
 
-	let mut leave_event_stub = serde_json::from_str::<CanonicalJsonObject>(
-		make_leave_response.event.get(),
-	)
-	.map_err(|e| {
-		err!(BadServerResponse(warn!(
-			"Invalid make_leave event json received from {remote_server} for {room_id}: {e:?}"
-		)))
-	})?;
+	let room_version_rules = room_version::rules(&room_version_id)?;
 
-	// TODO: Is origin needed?
-	leave_event_stub.insert(
-		"origin".to_owned(),
+	let mut event = serde_json::from_str::<CanonicalJsonObject>(make_leave_response.event.get())
+		.map_err(|e| {
+			err!(BadServerResponse(warn!(
+				"Invalid make_leave event json received from {remote_server} for {room_id}: \
+				 {e:?}"
+			)))
+		})?;
+
+	let displayname = self.services.users.displayname(user_id).ok();
+
+	let avatar_url = self.services.users.avatar_url(user_id).ok();
+
+	let blurhash = self.services.users.blurhash(user_id).ok();
+
+	let (displayname, avatar_url, blurhash) = join3(displayname, avatar_url, blurhash).await;
+
+	event.insert(
+		"content".into(),
+		to_canonical_value(RoomMemberEventContent {
+			displayname,
+			avatar_url,
+			blurhash,
+			reason,
+			..RoomMemberEventContent::new(MembershipState::Leave)
+		})?,
+	);
+
+	event.insert(
+		"origin".into(),
 		CanonicalJsonValue::String(
 			self.services
 				.globals
@@ -299,37 +335,38 @@ async fn remote_leave(&self, user_id: &UserId, room_id: &RoomId) -> Result {
 				.to_owned(),
 		),
 	);
-	leave_event_stub.insert(
-		"origin_server_ts".to_owned(),
-		CanonicalJsonValue::Integer(
-			utils::millis_since_unix_epoch()
-				.try_into()
-				.expect("Timestamp is valid js_int value"),
-		),
+
+	event.insert(
+		"origin_server_ts".into(),
+		CanonicalJsonValue::Integer(utils::millis_since_unix_epoch().try_into()?),
 	);
+
+	event.insert("room_id".into(), CanonicalJsonValue::String(room_id.as_str().into()));
+
+	event.insert("state_key".into(), CanonicalJsonValue::String(user_id.as_str().into()));
+
+	event.insert("sender".into(), CanonicalJsonValue::String(user_id.as_str().into()));
+
+	event.insert("type".into(), CanonicalJsonValue::String("m.room.member".into()));
 
 	let event_id = self
 		.services
 		.server_keys
-		.gen_id_hash_and_sign_event(&mut leave_event_stub, &room_version_id)?;
+		.gen_id_hash_and_sign_event(&mut event, &room_version_id)?;
 
-	// It has enough fields to be called a proper event now
-	let leave_event = leave_event_stub;
+	state_res::check_pdu_format(&event, &room_version_rules.event_format)?;
 
 	self.services
-		.sending
-		.send_federation_request(
-			&remote_server,
-			federation::membership::create_leave_event::v2::Request {
-				room_id: room_id.to_owned(),
-				event_id,
-				pdu: self
-					.services
-					.federation
-					.format_pdu_into(leave_event.clone(), Some(&room_version_id))
-					.await,
-			},
-		)
+		.federation
+		.execute(&remote_server, federation::membership::create_leave_event::v2::Request {
+			room_id: room_id.to_owned(),
+			event_id,
+			pdu: self
+				.services
+				.federation
+				.format_pdu_into(event.clone(), Some(&room_version_id))
+				.await,
+		})
 		.await?;
 
 	Ok(())

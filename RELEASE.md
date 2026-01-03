@@ -1,9 +1,9 @@
-# Tuwunel 1.4.5
+# Tuwunel 1.4.9
 
-October 24, 2025
+December 30, 2025
 
-All deployments serving ElementX, Element Pro, SchildiChat Next, or any client using sliding-sync should upgrade to this patch for an improved experience.
+All federating deployments must upgrade for follow-up mitigations similar to those patched by 1.4.8 now uncovered as a wider class of vulnerabilities in additional locations. This is an off-schedule coordinated security release. Full release notes will be included with the next scheduled release.
 
-### Bug Fixes
+### Security Fixes
 
-- Progress made for sliding-sync in 1.4.3 was effectively reverted by 1.4.4. This release puts sliding-sync back on track with further progress exceeding 1.4.3. This release is now shipping without any known issues. Please report all issues. **IMPORTANT:** Issues from prior releases (such as stuck or incorrect unread counts) benefit from clearing the app's cache to immediately resolve. Go to settings, tap the version number 7 times, then enter the menu to select `clear cache`.
+- Federation responses processed from a remote server assisting in membership state transitions lacked input validation: trusting, signing, and disseminating an event crafted by the remote server. These vulnerabilities were uncovered in a classic follow-up to the initial forgery attack pattern described in patch 1.4.8 also present in additional locations.

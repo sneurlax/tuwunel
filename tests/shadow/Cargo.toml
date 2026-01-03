@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-reqwest = { workspace = true, features = ["rustls"] }
+reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["std"] }
 serde_yaml = { workspace = true }

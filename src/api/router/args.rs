@@ -1,12 +1,13 @@
 use std::{fmt::Debug, mem, ops::Deref};
 
 use axum::{body::Body, extract::FromRequest};
+use axum_extra::extract::cookie::CookieJar;
 use bytes::{BufMut, Bytes, BytesMut};
 use ruma::{
 	CanonicalJsonObject, CanonicalJsonValue, DeviceId, OwnedDeviceId, OwnedServerName,
 	OwnedUserId, ServerName, UserId, api::IncomingRequest,
 };
-use tuwunel_core::{Error, Result, debug, debug_warn, err, trace, utils::string::EMPTY};
+use tuwunel_core::{Error, Result, debug_warn, err, trace, utils::string::EMPTY};
 use tuwunel_service::{Services, appservice::RegistrationInfo};
 
 use super::{auth, auth::Auth, request, request::Request};
@@ -17,6 +18,9 @@ use crate::State;
 pub(crate) struct Args<T> {
 	/// Request struct body
 	pub(crate) body: T,
+
+	/// Cookies received from the useragent.
+	pub(crate) cookie: CookieJar,
 
 	/// Federation server authentication: X-Matrix origin
 	/// None when not a federation server.
@@ -41,11 +45,6 @@ pub(crate) struct Args<T> {
 
 impl<T> Args<T> {
 	#[inline]
-	pub(crate) fn sender(&self) -> (&UserId, &DeviceId) {
-		(self.sender_user(), self.sender_device())
-	}
-
-	#[inline]
 	pub(crate) fn sender_user(&self) -> &UserId {
 		self.sender_user
 			.as_deref()
@@ -53,17 +52,17 @@ impl<T> Args<T> {
 	}
 
 	#[inline]
-	pub(crate) fn sender_device(&self) -> &DeviceId {
-		self.sender_device
-			.as_deref()
-			.expect("user must be authenticated and device identified")
-	}
-
-	#[inline]
 	pub(crate) fn origin(&self) -> &ServerName {
 		self.origin
 			.as_deref()
 			.expect("server must be authenticated for this handler")
+	}
+
+	#[inline]
+	pub(crate) fn sender_device(&self) -> Result<&DeviceId> {
+		self.sender_device
+			.as_deref()
+			.ok_or(err!(Request(Forbidden("user must be authenticated and device identified"))))
 	}
 }
 
@@ -87,7 +86,7 @@ where
 		level = "debug",
 		skip(services),
 		err(level = "debug")
-		ret,
+		ret(level = "trace"),
 	)]
 	async fn from_request(
 		request: hyper::Request<Body>,
@@ -95,6 +94,7 @@ where
 	) -> Result<Self, Self::Rejection> {
 		let mut request = request::from(services, request).await?;
 		let mut json_body = serde_json::from_slice::<CanonicalJsonValue>(&request.body).ok();
+		trace!(?request);
 
 		// while very unusual and really shouldn't be recommended, Synapse accepts POST
 		// requests with a completely empty body. very old clients, libraries, and some
@@ -104,16 +104,17 @@ where
 			&& request.parts.method == http::Method::POST
 			&& !request.parts.uri.path().contains("/media/")
 		{
-			trace!("json_body from_request: {:?}", json_body.clone());
 			debug_warn!(
 				"received a POST request with an empty body, defaulting/assuming to {{}} like \
 				 Synapse does"
 			);
 			json_body = Some(CanonicalJsonValue::Object(CanonicalJsonObject::new()));
 		}
+
 		let auth = auth::auth(services, &mut request, json_body.as_ref(), &T::METADATA).await?;
 		Ok(Self {
 			body: make_body::<T>(services, &mut request, json_body.as_mut(), &auth)?,
+			cookie: request.cookie,
 			origin: auth.origin,
 			sender_user: auth.sender_user,
 			sender_device: auth.sender_device,
@@ -147,16 +148,9 @@ fn into_http_request(request: &Request, body: Bytes) -> hyper::Request<Bytes> {
 		.headers_mut()
 		.expect("mutable http headers") = request.parts.headers.clone();
 
-	let http_request = http_request
-		.body(body)
-		.expect("http request body");
-
-	let headers = http_request.headers();
-	let method = http_request.method();
-	let uri = http_request.uri();
-	debug!("{method:?} {uri:?} {headers:?}");
-
 	http_request
+		.body(body)
+		.expect("http request body")
 }
 
 #[allow(clippy::needless_pass_by_value)]

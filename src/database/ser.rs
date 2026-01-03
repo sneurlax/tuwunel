@@ -1,7 +1,7 @@
-use std::io::Write;
+use std::{io::Write, mem::replace};
 
 use serde::{Deserialize, Serialize, ser};
-use tuwunel_core::{Error, Result, debug::type_name, err, result::DebugInspect, utils::exchange};
+use tuwunel_core::{Error, Result, debug::type_name, err, result::DebugInspect};
 
 use crate::util::unhandled;
 
@@ -52,7 +52,7 @@ pub(crate) struct Serializer<'a, W: Write> {
 }
 
 /// Newtype for JSON serialization.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Json<T>(pub T);
 
 /// Newtype for CBOR serialization.
@@ -97,7 +97,7 @@ impl<W: Write> Serializer<'_, W> {
 
 	fn record_start(&mut self) -> Result {
 		debug_assert!(!self.is_finalized(), "Starting a record after serialization finalized");
-		exchange(&mut self.sep, true)
+		replace(&mut self.sep, true)
 			.then(|| self.separator())
 			.unwrap_or(Ok(()))
 	}

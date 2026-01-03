@@ -1,11 +1,14 @@
 mod between;
+pub mod de;
 mod split;
 mod tests;
 mod unquote;
 mod unquoted;
 
+use std::{mem::replace, ops::Range};
+
 pub use self::{between::Between, split::SplitInfallible, unquote::Unquote, unquoted::Unquoted};
-use crate::{Result, utils::exchange};
+use crate::{Result, smallstr::SmallString};
 
 pub const EMPTY: &str = "";
 
@@ -76,7 +79,7 @@ where
 		.map(char::from)
 		.try_for_each(|ch| {
 			let m = ch.is_ascii_uppercase();
-			let s = exchange(&mut state, !m);
+			let s = replace(&mut state, !m);
 			if m && s {
 				output.write_char('_')?;
 			}
@@ -93,16 +96,52 @@ where
 /// ```
 #[must_use]
 #[allow(clippy::string_slice)]
-pub fn common_prefix<'a>(choice: &'a [&str]) -> &'a str {
+pub fn common_prefix<T: AsRef<str>>(choice: &[T]) -> &str {
 	choice.first().map_or(EMPTY, move |best| {
-		choice.iter().skip(1).fold(*best, |best, choice| {
-			&best[0..choice
-				.char_indices()
-				.zip(best.char_indices())
-				.take_while(|&(a, b)| a == b)
-				.count()]
-		})
+		choice
+			.iter()
+			.skip(1)
+			.fold(best.as_ref(), |best, choice| {
+				&best[0..choice
+					.as_ref()
+					.char_indices()
+					.zip(best.char_indices())
+					.take_while(|&(a, b)| a == b)
+					.count()]
+			})
 	})
+}
+
+#[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
+pub fn truncate_deterministic(str: &str, range: Option<Range<usize>>) -> &str {
+	let range = range.unwrap_or(0..str.len());
+	let len = str
+		.as_bytes()
+		.iter()
+		.copied()
+		.map(Into::into)
+		.fold(0_usize, usize::wrapping_add)
+		.wrapping_rem(str.len().max(1))
+		.clamp(range.start, range.end);
+
+	str.char_indices()
+		.nth(len)
+		.map(|(i, _)| str.split_at(i).0)
+		.unwrap_or(str)
+}
+
+pub fn to_small_string<const CAP: usize, T>(t: T) -> SmallString<[u8; CAP]>
+where
+	T: std::fmt::Display,
+{
+	use std::fmt::Write;
+
+	let mut ret = SmallString::<[u8; CAP]>::new();
+	write!(&mut ret, "{t}").expect("Failed to Display type in SmallString");
+
+	ret
 }
 
 /// Parses the bytes into a string.

@@ -4,6 +4,7 @@ mod ldap;
 mod logout;
 mod password;
 mod refresh;
+mod sso;
 mod token;
 
 use axum::extract::State;
@@ -12,8 +13,8 @@ use ruma::api::client::session::{
 	get_login_types::{
 		self,
 		v3::{
-			ApplicationServiceLoginType, JwtLoginType, LoginType, PasswordLoginType,
-			TokenLoginType,
+			ApplicationServiceLoginType, IdentityProvider, JwtLoginType, LoginType,
+			PasswordLoginType, SsoLoginType, TokenLoginType,
 		},
 	},
 	login::{
@@ -21,16 +22,17 @@ use ruma::api::client::session::{
 		v3::{DiscoveryInfo, HomeserverInfo, LoginInfo},
 	},
 };
-use tuwunel_core::{Err, Result, info, utils, utils::stream::ReadyExt};
+use tuwunel_core::{Err, Result, info, utils::stream::ReadyExt};
 use tuwunel_service::users::device::generate_refresh_token;
 
 use self::{ldap::ldap_login, password::password_login};
 pub(crate) use self::{
 	logout::{logout_all_route, logout_route},
 	refresh::refresh_token_route,
+	sso::{sso_callback_route, sso_login_route, sso_login_with_provider_route},
 	token::login_token_route,
 };
-use super::{DEVICE_ID_LENGTH, TOKEN_LENGTH};
+use super::TOKEN_LENGTH;
 use crate::Ruma;
 
 /// # `GET /_matrix/client/v3/login`
@@ -49,6 +51,20 @@ pub(crate) async fn get_login_types_route(
 		LoginType::Jwt(JwtLoginType::default()),
 		LoginType::Token(TokenLoginType {
 			get_login_token: services.config.login_via_existing_session,
+		}),
+		LoginType::Sso(SsoLoginType {
+			identity_providers: services
+				.config
+				.identity_provider
+				.iter()
+				.cloned()
+				.map(|config| IdentityProvider {
+					id: config.id().to_owned(),
+					brand: Some(config.brand.clone().into()),
+					icon: config.icon,
+					name: config.name.unwrap_or(config.brand),
+				})
+				.collect(),
 		}),
 	]))
 }
@@ -97,43 +113,39 @@ pub(crate) async fn login_route(
 	// Generate a new refresh_token if requested by client
 	let refresh_token = expires_in.is_some().then(generate_refresh_token);
 
-	// Generate new device id if the user didn't specify one
-	let device_id = body
-		.device_id
-		.clone()
-		.unwrap_or_else(|| utils::random_string(DEVICE_ID_LENGTH).into());
-
 	// Determine if device_id was provided and exists in the db for this user
-	let device_exists = services
-		.users
-		.all_device_ids(&user_id)
-		.ready_any(|v| v == device_id)
-		.await;
-
-	if !device_exists {
-		services
+	let device_id = if let Some(device_id) = &body.device_id
+		&& services
 			.users
-			.create_device(
-				&user_id,
-				&device_id,
-				(&access_token, expires_in),
-				refresh_token.as_deref(),
-				body.initial_device_display_name.clone(),
-				Some(client.to_string()),
-			)
-			.await?;
-	} else {
+			.all_device_ids(&user_id)
+			.ready_any(|v| v == device_id)
+			.await
+	{
 		services
 			.users
 			.set_access_token(
 				&user_id,
-				&device_id,
+				device_id,
 				&access_token,
 				expires_in,
 				refresh_token.as_deref(),
 			)
 			.await?;
-	}
+
+		device_id.clone()
+	} else {
+		services
+			.users
+			.create_device(
+				&user_id,
+				body.device_id.as_deref(),
+				(Some(&access_token), expires_in),
+				refresh_token.as_deref(),
+				body.initial_device_display_name.as_deref(),
+				Some(client.to_string()),
+			)
+			.await?
+	};
 
 	info!("{user_id} logged in");
 

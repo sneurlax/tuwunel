@@ -39,11 +39,17 @@ pub use self::{
 	time::{
 		exponential_backoff::{continue_exponential_backoff, continue_exponential_backoff_secs},
 		now_millis as millis_since_unix_epoch, timepoint_ago, timepoint_from_now,
+		timepoint_has_passed,
 	},
 };
 
-#[inline]
-pub fn exchange<T>(state: &mut T, source: T) -> T { std::mem::replace(state, source) }
+pub const fn assert_send<T: Send>() {}
+pub const fn assert_sync<T: Sync>() {}
+pub const fn assert_dst<T: ?Sized>() {}
+pub const fn assert_sized<T: Sized>() {}
+pub const fn assert_unpin<T: Unpin>() {}
+pub const fn assert_unwind_safe<T: std::panic::UnwindSafe>() {}
+pub const fn assert_ref_unwind_safe<T: std::panic::RefUnwindSafe>() {}
 
 #[macro_export]
 macro_rules! extract_variant {

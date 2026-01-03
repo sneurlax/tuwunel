@@ -188,19 +188,14 @@ impl Builder {
 		let config = Config::new(&figment)
 			.map_err(|e| EmbedError::Config(e.to_string()))?;
 
-		let (reload_handles, flame_guard, cap_state) =
+		let (_flame_guard, logger) =
 			tuwunel::logging::init(&config)
 				.map_err(|e| EmbedError::Startup(e.to_string()))?;
-
-		let log = tuwunel_core::log::Log {
-			reload: reload_handles,
-			capture: cap_state,
-		};
 
 		let server = Arc::new(tuwunel_core::Server::new(
 			config,
 			Some(tokio::runtime::Handle::current()),
-			log,
+			logger,
 		));
 
 		let services = tuwunel_router::start(&server)

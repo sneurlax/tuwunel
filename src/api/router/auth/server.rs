@@ -1,6 +1,10 @@
 use axum::RequestPartsExt;
 use axum_extra::{TypedHeader, headers::Authorization, typed_header::TypedHeaderRejectionReason};
-use ruma::{CanonicalJsonObject, CanonicalJsonValue, api::federation::authentication::XMatrix};
+use http::uri::PathAndQuery;
+use ruma::{
+	CanonicalJsonName, CanonicalJsonObject, CanonicalJsonValue,
+	api::federation::authentication::XMatrix,
+};
 use tuwunel_core::{Err, Result, debug_error, err, warn};
 use tuwunel_service::{
 	Services,
@@ -14,7 +18,7 @@ pub(super) async fn auth_server(
 	request: &mut Request,
 	body: Option<&CanonicalJsonValue>,
 ) -> Result<Auth> {
-	type Member = (String, CanonicalJsonValue);
+	type Member = (CanonicalJsonName, CanonicalJsonValue);
 	type Object = CanonicalJsonObject;
 	type Value = CanonicalJsonValue;
 
@@ -27,8 +31,8 @@ pub(super) async fn auth_server(
 		.parts
 		.uri
 		.path_and_query()
-		.expect("all requests have a path")
-		.to_string();
+		.map(PathAndQuery::as_str)
+		.unwrap_or("/");
 
 	let signature: [Member; 1] =
 		[(x_matrix.key.as_str().into(), Value::String(x_matrix.sig.to_string()))];
@@ -42,7 +46,7 @@ pub(super) async fn auth_server(
 			("method".into(), Value::String(request.parts.method.as_str().into())),
 			("origin".into(), Value::String(origin.as_str().into())),
 			("signatures".into(), Value::Object(signatures.into())),
-			("uri".into(), Value::String(signature_uri)),
+			("uri".into(), Value::String(signature_uri.into())),
 		];
 
 		authorization.into()
@@ -52,7 +56,7 @@ pub(super) async fn auth_server(
 			("method".into(), Value::String(request.parts.method.as_str().into())),
 			("origin".into(), Value::String(origin.as_str().into())),
 			("signatures".into(), Value::Object(signatures.into())),
-			("uri".into(), Value::String(signature_uri)),
+			("uri".into(), Value::String(signature_uri.into())),
 		];
 
 		authorization.into()
@@ -66,7 +70,7 @@ pub(super) async fn auth_server(
 			err!(Request(Forbidden(debug_warn!("Failed to fetch signing keys: {e}"))))
 		})?;
 
-	let keys: PubKeys = [(x_matrix.key.to_string(), key.key)].into();
+	let keys: PubKeys = [(x_matrix.key.as_str().into(), key.key)].into();
 	let keys: PubKeyMap = [(origin.as_str().into(), keys)].into();
 	if let Err(e) = ruma::signatures::verify_json(&keys, &authorization) {
 		debug_error!("Failed to verify federation request from {origin}: {e}");

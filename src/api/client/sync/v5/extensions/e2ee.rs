@@ -32,6 +32,9 @@ pub(super) async fn collect(
 	conn: &Connection,
 ) -> Result<response::E2EE> {
 	let SyncInfo { services, sender_user, sender_device, .. } = sync_info;
+	let Some(sender_device) = sender_device else {
+		return Ok(response::E2EE::default());
+	};
 
 	let keys_changed = services
 		.users
@@ -170,6 +173,7 @@ async fn collect_room(
 				.ready_filter(|&user_id| user_id != sender_user)
 				.map(ToOwned::to_owned)
 				.map(|user_id| (MembershipState::Join, user_id))
+				.boxed()
 				.into_future()
 		})
 		.into();

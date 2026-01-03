@@ -1,11 +1,14 @@
-use std::{cmp::Ordering, collections::HashSet};
+use std::{
+	cmp::Ordering,
+	collections::{BTreeMap, HashSet},
+};
 
 use futures::{
 	FutureExt, StreamExt, TryFutureExt, TryStreamExt,
 	future::{OptionFuture, join, join3, join4},
 };
 use ruma::{
-	JsOption, MxcUri, OwnedMxcUri, RoomId, UserId,
+	JsOption, MxcUri, OwnedMxcUri, OwnedRoomId, RoomId, UserId,
 	api::client::sync::sync_events::{
 		UnreadNotificationsCount,
 		v5::{DisplayName, response, response::Heroes},
@@ -19,7 +22,7 @@ use ruma::{
 	},
 };
 use tuwunel_core::{
-	Result, at, err, is_equal_to,
+	Result, at, err, error, is_equal_to,
 	matrix::{Event, StateKey, pdu::PduCount},
 	ref_at,
 	utils::{
@@ -29,11 +32,40 @@ use tuwunel_core::{
 };
 use tuwunel_service::{Services, sync::Room};
 
-use super::{super::load_timeline, Connection, SyncInfo, WindowRoom};
+use super::{super::load_timeline, Connection, SyncInfo, Window, WindowRoom};
 use crate::client::ignored_filter;
 
 static DEFAULT_BUMP_TYPES: [TimelineEventType; 6] =
 	[CallInvite, PollStart, Beacon, RoomEncrypted, RoomMessage, Sticker];
+
+#[tracing::instrument(
+    name = "rooms",
+    level = "debug",
+    skip_all,
+    fields(
+        next_batch = conn.next_batch,
+        window = window.len(),
+    )
+)]
+pub(super) async fn handle(
+	sync_info: SyncInfo<'_>,
+	conn: &Connection,
+	window: &Window,
+) -> Result<BTreeMap<OwnedRoomId, response::Room>> {
+	window
+		.iter()
+		.stream()
+		.broad_filter_map(async |(room_id, room)| {
+			handle_room(sync_info, conn, room)
+				.map_ok(move |room| (room_id.clone(), room))
+				.inspect_err(|e| error!(?room_id, "sync handler: {e:?}"))
+				.await
+				.ok()
+		})
+		.collect()
+		.map(Ok)
+		.await
+}
 
 #[tracing::instrument(
 	name = "room",
@@ -42,13 +74,13 @@ static DEFAULT_BUMP_TYPES: [TimelineEventType; 6] =
 	fields(room_id, roomsince)
 )]
 #[allow(clippy::too_many_arguments)]
-pub(super) async fn handle(
+async fn handle_room(
 	SyncInfo { services, sender_user, .. }: SyncInfo<'_>,
 	conn: &Connection,
 	WindowRoom {
 		lists, membership, room_id, last_count, ..
 	}: &WindowRoom,
-) -> Result<Option<response::Room>> {
+) -> Result<response::Room> {
 	debug_assert!(
 		DEFAULT_BUMP_TYPES.is_sorted(),
 		"DEFAULT_BUMP_TYPES must be sorted for binary search"
@@ -65,7 +97,7 @@ pub(super) async fn handle(
 	);
 
 	if *membership == Some(MembershipState::Leave) {
-		return Ok(Some(response::Room {
+		return Ok(response::Room {
 			initial: roomsince.eq(&0).then_some(true),
 			lists: lists.clone(),
 			membership: membership.clone(),
@@ -80,7 +112,7 @@ pub(super) async fn handle(
 			],
 
 			..Default::default()
-		}));
+		});
 	}
 
 	let is_invite = *membership == Some(MembershipState::Invite);
@@ -143,9 +175,9 @@ pub(super) async fn handle(
 				.binary_search(pdu.event_type())
 				.is_ok()
 		})
+		.filter(|(_, pdu)| !pdu.is_redacted())
 		.map(at!(0))
-		.filter(|count| matches!(count, PduCount::Normal(_)))
-		.map(PduCount::into_unsigned)
+		.map(PduCount::into_signed)
 		.max()
 		.map(TryInto::try_into)
 		.flat_ok();
@@ -240,13 +272,13 @@ pub(super) async fn handle(
 		.map(Option::flatten);
 
 	let highlight_count = services
-		.user
+		.pusher
 		.highlight_count(sender_user, room_id)
 		.map(TryInto::try_into)
 		.map(Result::ok);
 
 	let notification_count = services
-		.user
+		.pusher
 		.notification_count(sender_user, room_id)
 		.map(TryInto::try_into)
 		.map(Result::ok);
@@ -271,7 +303,7 @@ pub(super) async fn handle(
 		.map(|is_dm| is_dm.then_some(is_dm));
 
 	let last_read_count = services
-		.user
+		.pusher
 		.last_notification_read(sender_user, room_id);
 
 	let timeline = timeline_pdus
@@ -295,20 +327,27 @@ pub(super) async fn handle(
 		.boxed()
 		.await;
 
-	let (heroes, hero_name, heroes_avatar) = calculate_heroes(
-		services,
-		sender_user,
-		room_id,
-		room_name.as_ref(),
-		room_avatar.as_deref(),
-	)
-	.await?;
+	let heroes: OptionFuture<_> = services
+		.config
+		.calculate_heroes
+		.then(|| {
+			calculate_heroes(
+				services,
+				sender_user,
+				room_id,
+				room_name.as_ref(),
+				room_avatar.as_deref(),
+			)
+		})
+		.into();
 
-	Ok(Some(response::Room {
+	let (heroes, heroes_name, heroes_avatar) = heroes.await.unwrap_or_default();
+
+	Ok(response::Room {
 		initial: roomsince.eq(&0).then_some(true),
 		lists: lists.clone(),
 		membership: membership.clone(),
-		name: room_name.or(hero_name),
+		name: room_name.or(heroes_name),
 		avatar: JsOption::from_option(room_avatar.or(heroes_avatar)),
 		is_dm,
 		heroes,
@@ -322,7 +361,7 @@ pub(super) async fn handle(
 		joined_count,
 		invited_count,
 		unread_notifications: UnreadNotificationsCount { highlight_count, notification_count },
-	}))
+	})
 }
 
 #[tracing::instrument(name = "heroes", level = "trace", skip_all)]
@@ -333,8 +372,9 @@ async fn calculate_heroes(
 	room_id: &RoomId,
 	room_name: Option<&DisplayName>,
 	room_avatar: Option<&MxcUri>,
-) -> Result<(Option<Heroes>, Option<DisplayName>, Option<OwnedMxcUri>)> {
+) -> (Option<Heroes>, Option<DisplayName>, Option<OwnedMxcUri>) {
 	const MAX_HEROES: usize = 5;
+
 	let heroes: Heroes = services
 		.state_cache
 		.room_members(room_id)
@@ -411,5 +451,5 @@ async fn calculate_heroes(
 		})
 		.flatten();
 
-	Ok((Some(heroes), hero_name, heroes_avatar))
+	(Some(heroes), hero_name, heroes_avatar)
 }

@@ -38,6 +38,9 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 		.ruma_route(&client::login_route)
 		.ruma_route(&client::login_token_route)
 		.ruma_route(&client::refresh_token_route)
+		.ruma_route(&client::sso_login_route)
+		.ruma_route(&client::sso_login_with_provider_route)
+		.ruma_route(&client::sso_callback_route)
 		.ruma_route(&client::whoami_route)
 		.ruma_route(&client::logout_route)
 		.ruma_route(&client::logout_all_route)
@@ -47,6 +50,7 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 		.ruma_route(&client::request_3pid_management_token_via_email_route)
 		.ruma_route(&client::request_3pid_management_token_via_msisdn_route)
 		.ruma_route(&client::check_registration_token_validity)
+		.ruma_route(&client::get_notifications_route)
 		.ruma_route(&client::get_capabilities_route)
 		.ruma_route(&client::get_pushrules_all_route)
 		.ruma_route(&client::get_pushrules_global_route)
@@ -145,6 +149,7 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			get(client::get_state_events_for_empty_key_route)
 				.put(client::send_state_event_for_empty_key_route),
 		)
+		.ruma_route(&client::events_route)
 		.ruma_route(&client::sync_events_route)
 		.ruma_route(&client::sync_events_v5_route)
 		.ruma_route(&client::get_context_route)
@@ -163,6 +168,10 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 		.ruma_route(&client::update_device_route)
 		.ruma_route(&client::delete_device_route)
 		.ruma_route(&client::delete_devices_route)
+		.ruma_route(&client::put_dehydrated_device_route)
+		.ruma_route(&client::delete_dehydrated_device_route)
+		.ruma_route(&client::get_dehydrated_device_route)
+		.ruma_route(&client::get_dehydrated_events_route)
 		.ruma_route(&client::get_tags_route)
 		.ruma_route(&client::update_tag_route)
 		.ruma_route(&client::delete_tag_route)
@@ -188,6 +197,9 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 		.route("/_tuwunel/server_version", get(client::tuwunel_server_version))
 		.ruma_route(&client::room_initial_sync_route)
 		.route("/client/server.json", get(client::syncv3_client_server_json));
+
+	// SS endpoint not related to federation
+	router = router.ruma_route(&server::get_openid_userinfo_route);
 
 	if config.allow_federation {
 		router = router
@@ -220,7 +232,6 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			.ruma_route(&server::get_profile_information_route)
 			.ruma_route(&server::get_keys_route)
 			.ruma_route(&server::claim_keys_route)
-			.ruma_route(&server::get_openid_userinfo_route)
 			.ruma_route(&server::get_hierarchy_route)
 			.ruma_route(&server::well_known_server)
 			.ruma_route(&server::get_content_route)
