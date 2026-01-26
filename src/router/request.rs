@@ -51,13 +51,12 @@ pub(crate) async fn handle(
 		tokio::select! {
 			response = execute(&services_, req, next, &parent) => response,
 			response = services_.server.until_shutdown()
-				.then(|()| {
+				.then(async |()| {
 					let timeout = services_.server.config.client_shutdown_timeout;
 					let timeout = Duration::from_secs(timeout);
-					sleep(timeout)
-				})
-				.map(|()| StatusCode::SERVICE_UNAVAILABLE)
-				.map(IntoResponse::into_response) => response,
+					sleep(timeout).await;
+					StatusCode::SERVICE_UNAVAILABLE.into_response()
+				}) => response,
 		}
 	});
 
