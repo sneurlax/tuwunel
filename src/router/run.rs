@@ -3,11 +3,8 @@ use std::{
 	time::Duration,
 };
 
-use futures::{FutureExt, pin_mut};
-use tuwunel_core::{
-	Error, Result, Server, debug, debug_error, debug_info, error, info,
-	utils::{BoolExt, future::OptionFutureExt},
-};
+use futures::FutureExt;
+use tuwunel_core::{Error, Result, Server, debug, debug_error, debug_info, error, info};
 use tuwunel_service::Services;
 
 use crate::{handle::ServerHandle, serve};
@@ -30,23 +27,27 @@ pub(crate) async fn run(services: Arc<Services>) -> Result {
 		.runtime()
 		.spawn(signal(server.clone(), handle.clone()));
 
-	let listener = services
-		.config
-		.listening
-		.then_async(|| {
-			server
-				.runtime()
-				.spawn(serve::serve(services.clone(), handle))
-				.map(|res| res.map_err(Error::from).unwrap_or_else(Err))
-		})
-		.unwrap_or_else_async(|| server.until_shutdown().map(Ok));
+	let mut listener = if services.config.listening {
+		let future = serve::serve(services.clone(), handle);
+		server
+			.runtime()
+			.spawn(future)
+			.map(|res| res.map_err(Error::from).unwrap_or_else(Err))
+			.boxed()
+	} else {
+		let server = server.clone();
+		async move {
+			server.until_shutdown().await;
+			Ok(())
+		}
+		.boxed()
+	};
 
 	// Focal point
 	debug!("Running");
-	pin_mut!(listener);
 	let res = tokio::select! {
-		res = &mut listener => res.unwrap_or(Ok(())),
-		res = services.poll() => handle_services_finish(server, res, listener.await),
+		res = &mut listener => res,
+		res = services.poll() => handle_services_poll(server, res, listener).await,
 	};
 
 	// Join the signal handler before we leave.
@@ -129,10 +130,10 @@ fn handle_shutdown(server: &Arc<Server>, handle: &ServerHandle) {
 	handle.graceful_shutdown(Some(timeout));
 }
 
-fn handle_services_finish(
+async fn handle_services_poll(
 	server: &Arc<Server>,
 	result: Result,
-	listener: Option<Result>,
+	listener: impl Future<Output = Result>,
 ) -> Result {
 	debug!("Service manager finished: {result:?}");
 
@@ -142,7 +143,7 @@ fn handle_services_finish(
 		error!("Failed to send shutdown signal: {e}");
 	}
 
-	if let Some(Err(e)) = listener {
+	if let Err(e) = listener.await {
 		error!("Client listener task finished with error: {e}");
 	}
 
