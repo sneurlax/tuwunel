@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **E2EE-02**: User can claim another user's one-time keys for establishing an Olm session under Shadow
 - [ ] **E2EE-03**: Two users can exchange encrypted messages in an E2EE room under Shadow
 - [ ] **E2EE-04**: E2EE key exchange completes deterministically without timing-dependent retry loops
-- [ ] **E2EE-05**: SAS verification between two devices completes under Shadow simulation
+- [x] **E2EE-05**: SAS verification between two devices completes under Shadow simulation
 
 ### Test Scenarios — Network Conditions
 
@@ -125,7 +125,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | E2EE-02 | Phase 2 | Pending |
 | E2EE-03 | Phase 2 | Pending |
 | E2EE-04 | Phase 2 | Pending |
-| E2EE-05 | Phase 2 | Pending |
+| E2EE-05 | Phase 2 | Complete |
 | NET-01 | Phase 3 | Pending |
 | NET-02 | Phase 3 | Pending |
 | NET-03 | Phase 3 | Pending |
