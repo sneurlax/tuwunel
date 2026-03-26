@@ -61,7 +61,10 @@ Plans:
   2. The E2EE messaging scenario passes when the network topology applies 200ms RTT latency and 2% packet loss
   3. A Shadow simulation spawns 100 concurrent matrix-test-client processes; all 100 exit 0 after registering, logging in, and sending one message
   4. The server remains responsive throughout the 100-client load run (no client times out before Shadow's stop_time)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — Inline GML graph support, TopologyFixture builder with 3 named fixtures, E2EE under impairment test
+- [ ] 03-02-PLAN.md — Load test scenario, LoadTest subcommand, N-host config builder, 100-client integration test
 
 ### Phase 4: Embed Crate
 **Goal**: A tuwunel-embed crate exists as a new workspace member; EmbeddedHomeserver::start(config) launches an in-process tuwunel server and returns a base_url; multiple instances run concurrently in the same process without panics; stop() shuts down cleanly
@@ -84,5 +87,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Shadow Infrastructure | 0/3 | Planned | - |
 | 2. CS API and E2EE Tests | 0/4 | Planned | - |
-| 3. Network Conditions and Load | 0/TBD | Not started | - |
+| 3. Network Conditions and Load | 0/2 | Planned | - |
 | 4. Embed Crate | 0/TBD | Not started | - |
