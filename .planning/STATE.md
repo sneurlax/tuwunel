@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-26T01:30:05.443Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-26T01:34:40.435Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (shadow-infrastructure) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 01 P01 | 4min | 2 tasks | 9 files |
+| Phase 01 P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,7 @@ Recent decisions affecting current work:
 - [Init]: EMBD-10 (in-memory transport) may slip to v2 — flag at plan time for Phase 4
 - [Phase 01]: Used marker feature shadow=[] instead of cfg flag for compile_error guard (Cargo stable lacks per-profile rustflags)
 - [Phase 01]: shadow_features includes all defaults except io_uring and systemd (systemd unnecessary under Shadow)
+- [Phase 01]: Used reqwest directly for Phase 1 smoke test instead of matrix-sdk (only needs GET to /_matrix/client/versions)
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T01:30:05.442Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-03-26T01:34:40.434Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

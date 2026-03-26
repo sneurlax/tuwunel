@@ -10,14 +10,14 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Shadow Infrastructure
 
 - [x] **SHAD-01**: Shadow YAML configs can be generated programmatically from Rust structs via serde_yaml
-- [ ] **SHAD-02**: Tuwunel binary starts under Shadow and responds to HTTP requests on a virtual IP
+- [x] **SHAD-02**: Tuwunel binary starts under Shadow and responds to HTTP requests on a virtual IP
 - [x] **SHAD-03**: io_uring feature is disabled in Shadow build profile (dedicated Cargo feature set or build flag)
 - [x] **SHAD-04**: Tuwunel config can be constructed programmatically via figment without any on-disk TOML files
-- [ ] **SHAD-05**: Server readiness is detected automatically (poll /_matrix/client/versions or parse stdout)
-- [ ] **SHAD-06**: Per-host stdout/stderr from Shadow is accessible for test assertions and failure diagnosis
+- [x] **SHAD-05**: Server readiness is detected automatically (poll /_matrix/client/versions or parse stdout)
+- [x] **SHAD-06**: Per-host stdout/stderr from Shadow is accessible for test assertions and failure diagnosis
 - [x] **SHAD-07**: All Shadow configs use explicit deterministic seed and stop_time for reproducibility
 - [x] **SHAD-08**: PCAP capture is available per host for network-level debugging
-- [ ] **SHAD-09**: On test failure, seed and log paths are printed for deterministic reproduction
+- [x] **SHAD-09**: On test failure, seed and log paths are printed for deterministic reproduction
 
 ### Port & Config
 
@@ -104,14 +104,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SHAD-01 | Phase 1 | Complete |
-| SHAD-02 | Phase 1 | Pending |
+| SHAD-02 | Phase 1 | Complete |
 | SHAD-03 | Phase 1 | Complete |
 | SHAD-04 | Phase 1 | Complete |
-| SHAD-05 | Phase 1 | Pending |
-| SHAD-06 | Phase 1 | Pending |
+| SHAD-05 | Phase 1 | Complete |
+| SHAD-06 | Phase 1 | Complete |
 | SHAD-07 | Phase 1 | Complete |
 | SHAD-08 | Phase 1 | Complete |
-| SHAD-09 | Phase 1 | Pending |
+| SHAD-09 | Phase 1 | Complete |
 | CONF-01 | Phase 1 | Pending |
 | CONF-02 | Phase 1 | Complete |
 | CONF-03 | Phase 1 | Complete |
