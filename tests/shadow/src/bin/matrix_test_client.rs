@@ -180,10 +180,10 @@ async fn run_e2ee_messaging(
 	server_url: &str,
 	role: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	eprintln!(
-		"TODO: e2ee-messaging for {role} against {server_url}"
-	);
-	Ok(())
+	shadow_test_harness::scenarios::e2ee_msg::run_e2ee_messaging(
+		server_url, role,
+	)
+	.await
 }
 
 async fn run_sas_verify(
