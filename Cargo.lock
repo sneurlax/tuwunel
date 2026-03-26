@@ -4556,12 +4556,15 @@ version = "1.5.1"
 dependencies = [
  "clap",
  "reqwest 0.13.1",
+ "ruma",
  "serde",
  "serde_json",
  "serde_yaml",
  "tempfile",
  "tokio",
  "toml 1.0.7+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
