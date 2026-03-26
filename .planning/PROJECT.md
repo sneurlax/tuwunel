@@ -22,9 +22,9 @@ Deterministic, reproducible E2E tests that verify tuwunel's Matrix protocol beha
 
 ### Active
 
-- [ ] Shadow test infrastructure running stock tuwunel binary
-- [ ] Basic E2E tests under Shadow (auth, sync, rooms, messaging)
-- [ ] E2EE tests under Shadow (key exchange, verification, encrypted messaging)
+- ✓ Shadow test infrastructure running stock tuwunel binary — Validated in Phase 1
+- ✓ Basic E2E tests under Shadow (auth, sync, rooms, messaging) — Validated in Phase 2
+- ✓ E2EE tests under Shadow (key exchange, verification, encrypted messaging) — Validated in Phase 2
 - [ ] tuwunel-embed crate with EmbeddedHomeserver API
 - [ ] Programmatic config construction (no file dependencies)
 - [ ] Port 0 / dynamic port support
@@ -66,8 +66,9 @@ Deterministic, reproducible E2E tests that verify tuwunel's Matrix protocol beha
 | Test stock tuwunel under Shadow before adding embed crate | Establishes correctness baseline; isolates effects of our changes | — Pending |
 | Shadow harness lives in this repo (not matrix-rust-client) | We're testing tuwunel itself; matrix-rust-client gets its own harness later | — Pending |
 | Add new tuwunel-embed crate rather than modifying src/main | Minimal diff from upstream; new workspace member is cleanly separable | — Pending |
-| Disable io_uring feature for Shadow builds | Shadow may not support io_uring syscalls; standard epoll works fine | — Pending |
+| Disable io_uring feature for Shadow builds | Shadow may not support io_uring syscalls; standard epoll works fine | Confirmed Phase 1 |
 | In-memory transport as later phase | Requires deeper router extraction; TCP-based testing validates more of the real stack | — Pending |
+| Use ruma+reqwest instead of matrix-sdk for test client | matrix-sdk 0.16 async-channel conflict with workspace patches; ruma+reqwest provides equivalent CS API coverage | Confirmed Phase 2 |
 
 ## Evolution
 
@@ -87,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after Phase 1 (Shadow Infrastructure) completion*
+*Last updated: 2026-03-26 after Phase 2 (CS API and E2EE Tests) completion*
