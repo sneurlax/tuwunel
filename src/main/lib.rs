@@ -1,5 +1,12 @@
 #![allow(unused_features)] // 1.96.0-nightly 2026-03-07 bug
 
+#[cfg(all(feature = "io_uring", feature = "shadow"))]
+compile_error!(
+	"io_uring feature is incompatible with Shadow builds. \
+	 Shadow cannot intercept io_uring syscalls via LD_PRELOAD. \
+	 Build with --no-default-features and a feature set excluding io_uring."
+);
+
 pub mod args;
 pub mod logging;
 pub mod mods;

@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "2"
-members = ["src/*"]
+members = ["src/*", "tests/shadow"]
 default-members = ["src/*"]
 
 [workspace.package]
@@ -705,6 +705,13 @@ strip = "none"
 #	'-Ztime-passes',
 #	'-Ztime-llvm-passes',
 #]
+
+# Shadow deterministic simulation profile; io_uring must NOT be enabled.
+# Build: cargo build --profile shadow --no-default-features --features shadow_features
+[profile.shadow]
+inherits = "release"
+strip = "none"
+debug = "limited"
 
 ###############################################################################
 #
