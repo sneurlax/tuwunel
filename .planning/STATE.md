@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-26T02:07:56.285Z"
+status: Ready to execute
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-26T02:47:14.478Z"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 7
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Deterministic, reproducible E2E tests that verify tuwunel's Matrix protocol behavior under realistic network conditions
-**Current focus:** Phase 01 — shadow-infrastructure
+**Current focus:** Phase 02 — cs-api-and-e2ee-tests
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (cs-api-and-e2ee-tests) — EXECUTING
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ Plan: Not started
 | Phase 01 P01 | 4min | 2 tasks | 9 files |
 | Phase 01 P02 | 3min | 2 tasks | 4 files |
 | Phase 01 P03 | 1min | 1 tasks | 1 files |
+| Phase 02 P01 | 8min | 2 tasks | 10 files |
+| Phase 02 P02 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -65,6 +67,10 @@ Recent decisions affecting current work:
 - [Phase 01]: shadow_features includes all defaults except io_uring and systemd (systemd unnecessary under Shadow)
 - [Phase 01]: Used reqwest directly for Phase 1 smoke test instead of matrix-sdk (only needs GET to /_matrix/client/versions)
 - [Phase 01]: Test builds shadow-profile binaries itself via cargo subprocess rather than requiring pre-built binaries
+- [Phase 02]: Used ruma + reqwest instead of matrix-sdk due to async-channel 2.3.1 fork conflict with matrix-sdk requirement for >= 2.5.0
+- [Phase 02]: MatrixClient wrapper struct provides equivalent API to matrix-sdk::Client for CS API operations
+- [Phase 02]: Used raw reqwest HTTP calls instead of matrix-sdk for CS API operations due to async-channel version conflict
+- [Phase 02]: Manual URL percent-encoding for room aliases to avoid adding urlencoding dependency
 
 ### Pending Todos
 
@@ -78,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:07:56.283Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-cs-api-and-e2ee-tests/02-CONTEXT.md
+Last session: 2026-03-26T02:47:14.476Z
+Stopped at: Completed 02-02-PLAN.md
+Resume file: None

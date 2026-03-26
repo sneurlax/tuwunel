@@ -47,7 +47,7 @@ Plans:
   4. E2EE SAS verification between two simulated devices completes under Shadow without timing-dependent retry
 **Plans:** 4 plans
 Plans:
-- [ ] 02-01-PLAN.md — matrix-sdk dependency, scenario module scaffold, multi-host Shadow config builder, subcommand stubs
+- [x] 02-01-PLAN.md — matrix-sdk dependency, scenario module scaffold, multi-host Shadow config builder, subcommand stubs
 - [ ] 02-02-PLAN.md — CS API scenario (register, login, room, message, sync) with two-client Shadow integration test
 - [ ] 02-03-PLAN.md — E2EE messaging scenario (key upload, claim, encrypted exchange) with Shadow integration test
 - [ ] 02-04-PLAN.md — SAS verification scenario (automated device verification) with Shadow integration test

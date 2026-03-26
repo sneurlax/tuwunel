@@ -27,12 +27,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Test Scenarios — Basic CS API
 
-- [ ] **TEST-01**: User can register an account via the Matrix registration API under Shadow
-- [ ] **TEST-02**: User can login with username/password and receive an access token under Shadow
-- [ ] **TEST-03**: User can create a room and receive a room_id under Shadow
-- [ ] **TEST-04**: User can send a text message to a room and another user receives it via sync under Shadow
-- [ ] **TEST-05**: Two clients on separate Shadow hosts can exchange messages through the server
-- [ ] **TEST-06**: Test results integrate with `cargo test` — Shadow process exit codes map to pass/fail assertions
+- [x] **TEST-01**: User can register an account via the Matrix registration API under Shadow
+- [x] **TEST-02**: User can login with username/password and receive an access token under Shadow
+- [x] **TEST-03**: User can create a room and receive a room_id under Shadow
+- [x] **TEST-04**: User can send a text message to a room and another user receives it via sync under Shadow
+- [x] **TEST-05**: Two clients on separate Shadow hosts can exchange messages through the server
+- [x] **TEST-06**: Test results integrate with `cargo test` — Shadow process exit codes map to pass/fail assertions
 
 ### Test Scenarios — E2EE
 
@@ -115,12 +115,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-01 | Phase 1 | Pending |
 | CONF-02 | Phase 1 | Complete |
 | CONF-03 | Phase 1 | Complete |
-| TEST-01 | Phase 2 | Pending |
-| TEST-02 | Phase 2 | Pending |
-| TEST-03 | Phase 2 | Pending |
-| TEST-04 | Phase 2 | Pending |
-| TEST-05 | Phase 2 | Pending |
-| TEST-06 | Phase 2 | Pending |
+| TEST-01 | Phase 2 | Complete |
+| TEST-02 | Phase 2 | Complete |
+| TEST-03 | Phase 2 | Complete |
+| TEST-04 | Phase 2 | Complete |
+| TEST-05 | Phase 2 | Complete |
+| TEST-06 | Phase 2 | Complete |
 | E2EE-01 | Phase 2 | Pending |
 | E2EE-02 | Phase 2 | Pending |
 | E2EE-03 | Phase 2 | Pending |
