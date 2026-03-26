@@ -5,10 +5,13 @@ version.workspace = true
 publish = false
 
 [dependencies]
+clap = { workspace = true, features = ["derive"] }
+reqwest = { workspace = true, features = ["rustls"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["std"] }
 serde_yaml = { workspace = true }
 tempfile = "3"
+tokio = { workspace = true }
 toml = { workspace = true, features = ["display"] }
 
 [[bin]]
