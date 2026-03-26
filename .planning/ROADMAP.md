@@ -45,7 +45,12 @@ Plans:
   2. A two-client Shadow scenario (clients on separate virtual hosts) can register, create a room, send a message, and have the other client receive it via sync — all within the Shadow stop_time
   3. Two clients can complete E2EE key upload, one-time key claim, and exchange an encrypted message in a Shadow scenario without any wall-clock sleeps
   4. E2EE SAS verification between two simulated devices completes under Shadow without timing-dependent retry
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 02-01-PLAN.md — matrix-sdk dependency, scenario module scaffold, multi-host Shadow config builder, subcommand stubs
+- [ ] 02-02-PLAN.md — CS API scenario (register, login, room, message, sync) with two-client Shadow integration test
+- [ ] 02-03-PLAN.md — E2EE messaging scenario (key upload, claim, encrypted exchange) with Shadow integration test
+- [ ] 02-04-PLAN.md — SAS verification scenario (automated device verification) with Shadow integration test
 
 ### Phase 3: Network Conditions and Load
 **Goal**: Named network topology fixtures (latency, packet loss, bandwidth) exist as reusable YAML templates, the E2EE messaging scenario passes under 200ms latency and 2% packet loss, and a load scenario with 100 concurrent clients all register and send at least one message successfully
@@ -78,6 +83,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Shadow Infrastructure | 0/3 | Planned | - |
-| 2. CS API and E2EE Tests | 0/TBD | Not started | - |
+| 2. CS API and E2EE Tests | 0/4 | Planned | - |
 | 3. Network Conditions and Load | 0/TBD | Not started | - |
 | 4. Embed Crate | 0/TBD | Not started | - |
