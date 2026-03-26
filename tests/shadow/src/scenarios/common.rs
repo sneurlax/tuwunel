@@ -6,7 +6,10 @@
 //! The ruma + reqwest approach provides equivalent functionality for
 //! CS API operations (registration, login, room management, messaging).
 
-use std::time::Duration;
+use std::{
+	sync::atomic::{AtomicU64, Ordering},
+	time::Duration,
+};
 
 /// Registration token matching TuwunelConfig default.
 pub const REGISTRATION_TOKEN: &str = "shadow_test_token";
@@ -16,6 +19,14 @@ pub const SERVER_NAME: &str = "tuwunel-server";
 
 /// Default password used for all test users.
 pub const DEFAULT_PASSWORD: &str = "shadow_test_pass";
+
+/// Atomic counter for generating unique transaction IDs.
+static TXN_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Generate a unique transaction ID for Matrix API calls.
+fn rand_txn_id() -> u64 {
+	TXN_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Poll `/_matrix/client/versions` until the server is ready.
 ///
@@ -239,6 +250,239 @@ impl MatrixClient {
 
 	/// Get a reference to the underlying HTTP client.
 	pub fn http(&self) -> &reqwest::Client { &self.http }
+
+	/// Create a room with an optional local alias name.
+	///
+	/// Posts to `/_matrix/client/v3/createRoom`. Returns the
+	/// room ID string on success.
+	pub async fn create_room(
+		&self,
+		alias_local_part: Option<&str>,
+	) -> Result<String, Box<dyn std::error::Error>> {
+		let token = self.access_token.as_deref().ok_or(
+			"create_room requires authentication",
+		)?;
+
+		let url = format!(
+			"{}/_matrix/client/v3/createRoom",
+			self.base_url
+		);
+
+		let mut body = serde_json::json!({});
+		if let Some(alias) = alias_local_part {
+			body["room_alias_name"] =
+				serde_json::Value::String(alias.to_owned());
+		}
+
+		let resp = self
+			.http
+			.post(&url)
+			.bearer_auth(token)
+			.json(&body)
+			.send()
+			.await?;
+
+		let status = resp.status();
+		let resp_body: serde_json::Value = resp.json().await?;
+
+		if !status.is_success() {
+			return Err(format!(
+				"createRoom failed: {status} {resp_body}"
+			)
+			.into());
+		}
+
+		let room_id = resp_body
+			.get("room_id")
+			.and_then(|v| v.as_str())
+			.ok_or("createRoom response missing room_id")?
+			.to_owned();
+
+		eprintln!("Created room: {room_id}");
+		Ok(room_id)
+	}
+
+	/// Send a text message to a room.
+	///
+	/// Posts to `/_matrix/client/v3/rooms/{room_id}/send/
+	/// m.room.message/{txn_id}`. Returns the event ID.
+	pub async fn send_text_message(
+		&self,
+		room_id: &str,
+		text: &str,
+	) -> Result<String, Box<dyn std::error::Error>> {
+		let token = self.access_token.as_deref().ok_or(
+			"send_text_message requires authentication",
+		)?;
+
+		let txn_id = format!("txn_{}", rand_txn_id());
+
+		let url = format!(
+			"{}/_matrix/client/v3/rooms/{}/send/m.room.message/{}",
+			self.base_url, room_id, txn_id
+		);
+
+		let body = serde_json::json!({
+			"msgtype": "m.text",
+			"body": text
+		});
+
+		let resp = self
+			.http
+			.put(&url)
+			.bearer_auth(token)
+			.json(&body)
+			.send()
+			.await?;
+
+		let status = resp.status();
+		let resp_body: serde_json::Value = resp.json().await?;
+
+		if !status.is_success() {
+			return Err(format!(
+				"send message failed: {status} {resp_body}"
+			)
+			.into());
+		}
+
+		let event_id = resp_body
+			.get("event_id")
+			.and_then(|v| v.as_str())
+			.ok_or("send response missing event_id")?
+			.to_owned();
+
+		eprintln!("Sent message, event_id: {event_id}");
+		Ok(event_id)
+	}
+
+	/// Join a room by alias or room ID.
+	///
+	/// Posts to `/_matrix/client/v3/join/{roomIdOrAlias}`.
+	/// Returns the room ID.
+	pub async fn join_room(
+		&self,
+		room_id_or_alias: &str,
+	) -> Result<String, Box<dyn std::error::Error>> {
+		let token = self.access_token.as_deref().ok_or(
+			"join_room requires authentication",
+		)?;
+
+		let encoded = room_id_or_alias
+			.replace('#', "%23")
+			.replace(':', "%3A");
+		let url = format!(
+			"{}/_matrix/client/v3/join/{}",
+			self.base_url, encoded
+		);
+
+		let resp = self
+			.http
+			.post(&url)
+			.bearer_auth(token)
+			.json(&serde_json::json!({}))
+			.send()
+			.await?;
+
+		let status = resp.status();
+		let resp_body: serde_json::Value = resp.json().await?;
+
+		if !status.is_success() {
+			return Err(format!(
+				"join room failed: {status} {resp_body}"
+			)
+			.into());
+		}
+
+		let room_id = resp_body
+			.get("room_id")
+			.and_then(|v| v.as_str())
+			.ok_or("join response missing room_id")?
+			.to_owned();
+
+		eprintln!("Joined room: {room_id}");
+		Ok(room_id)
+	}
+
+	/// Join a room by alias with retry loop.
+	///
+	/// Retries up to `max_retries` times with
+	/// `retry_interval_ms` between attempts. This is needed
+	/// because the room alias may not be immediately available
+	/// after creation on a different host.
+	pub async fn join_room_with_retry(
+		&self,
+		room_id_or_alias: &str,
+		max_retries: u32,
+		retry_interval_ms: u64,
+	) -> Result<String, Box<dyn std::error::Error>> {
+		let interval =
+			Duration::from_millis(retry_interval_ms);
+
+		for attempt in 0..max_retries {
+			match self.join_room(room_id_or_alias).await {
+				| Ok(room_id) => {
+					eprintln!(
+						"Joined after {attempt} retries"
+					);
+					return Ok(room_id);
+				},
+				| Err(e) => {
+					eprintln!(
+						"Join attempt {attempt}: {e}"
+					);
+					tokio::time::sleep(interval).await;
+				},
+			}
+		}
+
+		Err(format!(
+			"Failed to join {room_id_or_alias} after \
+			 {max_retries} attempts"
+		)
+		.into())
+	}
+
+	/// Perform a single sync request.
+	///
+	/// Gets `/_matrix/client/v3/sync` with optional
+	/// `since` token. Returns the raw JSON response.
+	pub async fn sync(
+		&self,
+		since: Option<&str>,
+	) -> Result<serde_json::Value, Box<dyn std::error::Error>>
+	{
+		let token = self.access_token.as_deref().ok_or(
+			"sync requires authentication",
+		)?;
+
+		let mut url = format!(
+			"{}/_matrix/client/v3/sync?timeout=30000",
+			self.base_url
+		);
+		if let Some(since_token) = since {
+			url.push_str("&since=");
+			url.push_str(since_token);
+		}
+
+		let resp = self
+			.http
+			.get(&url)
+			.bearer_auth(token)
+			.send()
+			.await?;
+
+		let status = resp.status();
+		let resp_body: serde_json::Value = resp.json().await?;
+
+		if !status.is_success() {
+			return Err(format!(
+				"sync failed: {status} {resp_body}"
+			)
+			.into());
+		}
+
+		Ok(resp_body)
+	}
 }
 
 /// Create a MatrixClient pointed at the given server URL.

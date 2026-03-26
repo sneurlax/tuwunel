@@ -170,8 +170,10 @@ async fn run_cs_api(
 	server_url: &str,
 	role: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	eprintln!("TODO: cs-api for {role} against {server_url}");
-	Ok(())
+	shadow_test_harness::scenarios::cs_api::run_cs_api(
+		server_url, role,
+	)
+	.await
 }
 
 async fn run_e2ee_messaging(
