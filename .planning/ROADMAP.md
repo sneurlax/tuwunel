@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3 plans
 Plans:
 - [x] 01-01-PLAN.md — Shadow build profile, io_uring compile guard, and test harness crate with config generation
-- [ ] 01-02-PLAN.md — matrix-test-client binary with smoke subcommand and Shadow runner module
+- [x] 01-02-PLAN.md — matrix-test-client binary with smoke subcommand and Shadow runner module
 - [ ] 01-03-PLAN.md — Integration test wiring configs, Shadow invocation, and smoke assertion
 **Deferred**: CONF-01 (port 0 support) deferred to Phase 4 per D-07 -- Shadow virtual IPs eliminate port conflicts in Phase 1-3 scenarios.
 
