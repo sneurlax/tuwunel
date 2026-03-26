@@ -1,0 +1,16 @@
+[package]
+name = "shadow-test-harness"
+edition.workspace = true
+version.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["std"] }
+serde_yaml = { workspace = true }
+tempfile = "3"
+toml = { workspace = true, features = ["display"] }
+
+[[bin]]
+name = "matrix-test-client"
+path = "src/bin/matrix_test_client.rs"
