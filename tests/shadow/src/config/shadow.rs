@@ -33,6 +33,8 @@ pub struct Network {
 pub struct NetworkGraph {
 	#[serde(rename = "type")]
 	pub graph_type: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub inline: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -104,6 +106,7 @@ impl Default for Network {
 		Self {
 			graph: NetworkGraph {
 				graph_type: "1_gbit_switch".to_owned(),
+				inline: None,
 			},
 		}
 	}
@@ -236,4 +239,147 @@ pub fn three_host_config(
 		host_option_defaults: Some(HostOptionDefaults::default()),
 		hosts,
 	}
+}
+
+/// Named network topology fixture for Shadow simulations.
+/// Per D-01: builder functions, type-safe, composable.
+/// Per D-02: sensible defaults with optional overrides.
+#[derive(Clone, Debug)]
+pub struct TopologyFixture {
+	/// One-way latency in milliseconds (RTT = 2x this value for
+	/// self-loop topology).
+	pub latency_ms: u32,
+	/// Packet loss rate as a fraction (0.0 to 1.0).
+	pub packet_loss: f64,
+	/// Download bandwidth (e.g., "5 Mbit").
+	pub bandwidth_down: String,
+	/// Upload bandwidth (e.g., "1 Mbit").
+	pub bandwidth_up: String,
+}
+
+impl TopologyFixture {
+	/// Slow mobile network: 150ms one-way latency (300ms RTT),
+	/// 1% packet loss, 5 Mbit down / 1 Mbit up.
+	pub fn slow_mobile() -> Self {
+		Self {
+			latency_ms: 150,
+			packet_loss: 0.01,
+			bandwidth_down: "5 Mbit".to_owned(),
+			bandwidth_up: "1 Mbit".to_owned(),
+		}
+	}
+
+	/// High latency link: 500ms one-way (1000ms RTT),
+	/// no packet loss, 100 Mbit symmetric.
+	pub fn high_latency() -> Self {
+		Self {
+			latency_ms: 500,
+			packet_loss: 0.0,
+			bandwidth_down: "100 Mbit".to_owned(),
+			bandwidth_up: "100 Mbit".to_owned(),
+		}
+	}
+
+	/// Lossy link: 50ms one-way (100ms RTT),
+	/// 5% packet loss, 10 Mbit symmetric.
+	pub fn lossy_link() -> Self {
+		Self {
+			latency_ms: 50,
+			packet_loss: 0.05,
+			bandwidth_down: "10 Mbit".to_owned(),
+			bandwidth_up: "10 Mbit".to_owned(),
+		}
+	}
+
+	/// Override the one-way latency (ms).
+	pub fn with_latency(mut self, ms: u32) -> Self {
+		self.latency_ms = ms;
+		self
+	}
+
+	/// Override the packet loss rate (0.0 to 1.0).
+	pub fn with_loss(mut self, loss: f64) -> Self {
+		self.packet_loss = loss;
+		self
+	}
+
+	/// Override the download bandwidth (e.g., "10 Mbit").
+	pub fn with_bandwidth_down(mut self, bw: &str) -> Self {
+		self.bandwidth_down = bw.to_owned();
+		self
+	}
+
+	/// Override the upload bandwidth (e.g., "5 Mbit").
+	pub fn with_bandwidth_up(mut self, bw: &str) -> Self {
+		self.bandwidth_up = bw.to_owned();
+		self
+	}
+
+	/// Build the GML graph string for this topology.
+	/// Per Pitfall 6: packet_loss is always included even when 0.0.
+	pub fn to_gml(&self) -> String {
+		format!(
+			"graph [\n\
+			 \x20 directed 0\n\
+			 \x20 node [\n\
+			 \x20   id 0\n\
+			 \x20   host_bandwidth_down \"{bd}\"\n\
+			 \x20   host_bandwidth_up \"{bu}\"\n\
+			 \x20 ]\n\
+			 \x20 edge [\n\
+			 \x20   source 0\n\
+			 \x20   target 0\n\
+			 \x20   latency \"{lat} ms\"\n\
+			 \x20   packet_loss {loss}\n\
+			 \x20 ]\n\
+			 ]",
+			bd = self.bandwidth_down,
+			bu = self.bandwidth_up,
+			lat = self.latency_ms,
+			loss = self.packet_loss,
+		)
+	}
+
+	/// Build a complete Network struct from this topology.
+	pub fn to_network(&self) -> Network {
+		Network {
+			graph: NetworkGraph {
+				graph_type: "gml".to_owned(),
+				inline: Some(self.to_gml()),
+			},
+		}
+	}
+}
+
+/// Build a Shadow config with tuwunel-server + alice-host + bob-host
+/// using a custom network topology.
+///
+/// Same as [`three_host_config`] but replaces the default 1 Gbit
+/// switch with the given [`TopologyFixture`].
+#[expect(clippy::too_many_arguments)]
+pub fn three_host_config_with_topology(
+	tuwunel_bin: &Path,
+	client_bin: &Path,
+	config_path: &Path,
+	data_dir: &Path,
+	subcommand: &str,
+	stop_time: &str,
+	seed: u32,
+	alice_start: &str,
+	bob_start: &str,
+	topology: &TopologyFixture,
+) -> ShadowConfig {
+	let mut config = three_host_config(
+		tuwunel_bin,
+		client_bin,
+		config_path,
+		data_dir,
+		subcommand,
+		stop_time,
+		seed,
+		alice_start,
+		bob_start,
+	);
+	config.network = topology.to_network();
+	config
 }
