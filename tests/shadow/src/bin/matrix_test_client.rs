@@ -190,8 +190,8 @@ async fn run_sas_verify(
 	server_url: &str,
 	role: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	eprintln!(
-		"TODO: sas-verify for {role} against {server_url}"
-	);
-	Ok(())
+	shadow_test_harness::scenarios::sas_verify::run_sas_verify(
+		server_url, role,
+	)
+	.await
 }
