@@ -21,6 +21,8 @@ pub struct TuwunelGlobal {
 	pub log: String,
 	/// Disable federation startup burst -- no external servers in Shadow.
 	pub startup_netburst: bool,
+	/// Allow E2EE encryption (default true for E2EE test scenarios).
+	pub allow_encryption: bool,
 }
 
 impl TuwunelConfig {
@@ -41,6 +43,7 @@ impl TuwunelConfig {
 				registration_token: "shadow_test_token".to_owned(),
 				log: "info".to_owned(),
 				startup_netburst: false,
+			allow_encryption: true,
 			},
 		}
 	}

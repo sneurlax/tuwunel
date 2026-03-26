@@ -28,6 +28,41 @@ enum Commands {
 		#[arg(long, default_value_t = 500)]
 		retry_interval_ms: u64,
 	},
+
+	/// CS API test: register, login, create room, send message,
+	/// sync
+	CsApi {
+		/// Base URL of the tuwunel server
+		#[arg(long)]
+		server_url: String,
+
+		/// Role for this client process ("alice" or "bob")
+		#[arg(long)]
+		role: String,
+	},
+
+	/// E2EE messaging: key upload, claim, encrypted message
+	/// exchange
+	E2eeMessaging {
+		/// Base URL of the tuwunel server
+		#[arg(long)]
+		server_url: String,
+
+		/// Role for this client process ("alice" or "bob")
+		#[arg(long)]
+		role: String,
+	},
+
+	/// SAS verification between two devices
+	SasVerify {
+		/// Base URL of the tuwunel server
+		#[arg(long)]
+		server_url: String,
+
+		/// Role for this client process ("alice" or "bob")
+		#[arg(long)]
+		role: String,
+	},
 }
 
 fn main() -> ExitCode {
@@ -38,23 +73,38 @@ fn main() -> ExitCode {
 			server_url,
 			max_retries,
 			retry_interval_ms,
-		} => {
-			let rt = tokio::runtime::Builder::new_current_thread()
-				.enable_all()
-				.build()
-				.expect("failed to build tokio runtime");
+		} => run_in_runtime(run_smoke(
+			&server_url,
+			max_retries,
+			retry_interval_ms,
+		)),
+		| Commands::CsApi { server_url, role } =>
+			run_in_runtime(run_cs_api(&server_url, &role)),
+		| Commands::E2eeMessaging { server_url, role } =>
+			run_in_runtime(run_e2ee_messaging(
+				&server_url, &role,
+			)),
+		| Commands::SasVerify { server_url, role } =>
+			run_in_runtime(run_sas_verify(&server_url, &role)),
+	}
+}
 
-			match rt.block_on(run_smoke(
-				&server_url,
-				max_retries,
-				retry_interval_ms,
-			)) {
-				| Ok(()) => ExitCode::SUCCESS,
-				| Err(e) => {
-					eprintln!("Smoke test failed: {e}");
-					ExitCode::FAILURE
-				},
-			}
+/// Run an async function in a single-threaded tokio runtime.
+fn run_in_runtime(
+	future: impl std::future::Future<
+		Output = Result<(), Box<dyn std::error::Error>>,
+	>,
+) -> ExitCode {
+	let rt = tokio::runtime::Builder::new_current_thread()
+		.enable_all()
+		.build()
+		.expect("failed to build tokio runtime");
+
+	match rt.block_on(future) {
+		| Ok(()) => ExitCode::SUCCESS,
+		| Err(e) => {
+			eprintln!("Test failed: {e}");
+			ExitCode::FAILURE
 		},
 	}
 }
@@ -114,4 +164,32 @@ async fn run_smoke(
 		 {max_retries} attempts"
 	)
 	.into())
+}
+
+async fn run_cs_api(
+	server_url: &str,
+	role: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+	eprintln!("TODO: cs-api for {role} against {server_url}");
+	Ok(())
+}
+
+async fn run_e2ee_messaging(
+	server_url: &str,
+	role: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+	eprintln!(
+		"TODO: e2ee-messaging for {role} against {server_url}"
+	);
+	Ok(())
+}
+
+async fn run_sas_verify(
+	server_url: &str,
+	role: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+	eprintln!(
+		"TODO: sas-verify for {role} against {server_url}"
+	);
+	Ok(())
 }

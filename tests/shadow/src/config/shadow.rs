@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use serde::Serialize;
 
@@ -117,5 +117,123 @@ impl Default for HostOptionDefaults {
 			pcap_enabled: Some(true),
 			pcap_capture_size: None,
 		}
+	}
+}
+
+/// Build a Shadow config with tuwunel-server + alice-host + bob-host.
+///
+/// Per D-07: separate Shadow hosts with own virtual IPs.
+/// Per D-08: deterministic naming conventions.
+///
+/// # Arguments
+///
+/// * `tuwunel_bin` - Path to the tuwunel server binary
+/// * `client_bin` - Path to the matrix-test-client binary
+/// * `config_path` - Path to the tuwunel TOML config file
+/// * `data_dir` - Shadow data directory path
+/// * `subcommand` - Client subcommand to run (e.g., "cs-api")
+/// * `stop_time` - Shadow simulation stop time (e.g., "120s")
+/// * `seed` - Deterministic RNG seed
+/// * `alice_start` - Start time for alice's client process
+/// * `bob_start` - Start time for bob's client process
+#[expect(clippy::too_many_arguments)]
+pub fn three_host_config(
+	tuwunel_bin: &Path,
+	client_bin: &Path,
+	config_path: &Path,
+	data_dir: &Path,
+	subcommand: &str,
+	stop_time: &str,
+	seed: u32,
+	alice_start: &str,
+	bob_start: &str,
+) -> ShadowConfig {
+	let tuwunel_path = tuwunel_bin
+		.to_str()
+		.expect("tuwunel_bin path must be valid UTF-8")
+		.to_owned();
+	let client_path = client_bin
+		.to_str()
+		.expect("client_bin path must be valid UTF-8")
+		.to_owned();
+	let config_str = config_path
+		.to_str()
+		.expect("config_path must be valid UTF-8")
+		.to_owned();
+	let data_str = data_dir
+		.to_str()
+		.expect("data_dir path must be valid UTF-8")
+		.to_owned();
+
+	let mut server_env = BTreeMap::new();
+	server_env
+		.insert("TUWUNEL_CONFIG".to_owned(), config_str);
+	server_env
+		.insert("TUWUNEL_LOG".to_owned(), "info".to_owned());
+
+	let server_host = Host {
+		network_node_id: 0,
+		host_options: None,
+		processes: vec![Process {
+			path: tuwunel_path,
+			args: None,
+			start_time: Some("1s".to_owned()),
+			expected_final_state: Some("running".to_owned()),
+			environment: Some(server_env),
+			shutdown_time: None,
+			shutdown_signal: Some("SIGTERM".to_owned()),
+		}],
+	};
+
+	let alice_host = Host {
+		network_node_id: 0,
+		host_options: None,
+		processes: vec![Process {
+			path: client_path.clone(),
+			args: Some(format!(
+				"{subcommand} --server-url \
+				 http://tuwunel-server:8448 --role alice"
+			)),
+			start_time: Some(alice_start.to_owned()),
+			expected_final_state: Some("exited".to_owned()),
+			environment: None,
+			shutdown_time: None,
+			shutdown_signal: None,
+		}],
+	};
+
+	let bob_host = Host {
+		network_node_id: 0,
+		host_options: None,
+		processes: vec![Process {
+			path: client_path,
+			args: Some(format!(
+				"{subcommand} --server-url \
+				 http://tuwunel-server:8448 --role bob"
+			)),
+			start_time: Some(bob_start.to_owned()),
+			expected_final_state: Some("exited".to_owned()),
+			environment: None,
+			shutdown_time: None,
+			shutdown_signal: None,
+		}],
+	};
+
+	let mut hosts = BTreeMap::new();
+	hosts.insert("tuwunel-server".to_owned(), server_host);
+	hosts.insert("alice-host".to_owned(), alice_host);
+	hosts.insert("bob-host".to_owned(), bob_host);
+
+	ShadowConfig {
+		general: General {
+			stop_time: stop_time.to_owned(),
+			seed,
+			model_unblocked_syscall_latency: true,
+			data_directory: Some(data_str),
+			log_level: Some("info".to_owned()),
+		},
+		network: Network::default(),
+		host_option_defaults: Some(HostOptionDefaults::default()),
+		hosts,
 	}
 }
