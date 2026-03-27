@@ -52,9 +52,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Test Scenarios — Load
 
-- [ ] **LOAD-01**: Shadow simulation can spawn 100 concurrent test client processes against one server
-- [ ] **LOAD-02**: All 100 clients can register, login, and send at least one message successfully
-- [ ] **LOAD-03**: Server remains responsive under concurrent load (sync responses within stop_time)
+- [x] **LOAD-01**: Shadow simulation can spawn 100 concurrent test client processes against one server
+- [x] **LOAD-02**: All 100 clients can register, login, and send at least one message successfully
+- [x] **LOAD-03**: Server remains responsive under concurrent load (sync responses within stop_time)
 
 ### Embed Crate
 
@@ -131,9 +131,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NET-03 | Phase 3 | Pending |
 | NET-04 | Phase 3 | Pending |
 | NET-05 | Phase 3 | Pending |
-| LOAD-01 | Phase 3 | Pending |
-| LOAD-02 | Phase 3 | Pending |
-| LOAD-03 | Phase 3 | Pending |
+| LOAD-01 | Phase 3 | Complete |
+| LOAD-02 | Phase 3 | Complete |
+| LOAD-03 | Phase 3 | Complete |
 | EMBD-01 | Phase 4 | Pending |
 | EMBD-02 | Phase 4 | Pending |
 | EMBD-03 | Phase 4 | Pending |
