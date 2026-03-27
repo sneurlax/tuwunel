@@ -241,6 +241,129 @@ pub fn three_host_config(
 	}
 }
 
+/// Build a Shadow config for load testing with N client hosts.
+///
+/// Per D-05: one Shadow host per client for realistic network
+/// stacks. Per D-07: client-001 creates the room, others join by
+/// alias. Per D-08: hosts generated programmatically with
+/// client-{NNN} naming.
+#[expect(clippy::too_many_arguments)]
+pub fn load_test_config(
+	tuwunel_bin: &Path,
+	client_bin: &Path,
+	config_path: &Path,
+	data_dir: &Path,
+	client_count: u32,
+	topology: &TopologyFixture,
+	stop_time: &str,
+	seed: u32,
+) -> ShadowConfig {
+	let tuwunel_path = tuwunel_bin
+		.to_str()
+		.expect("tuwunel_bin path must be valid UTF-8")
+		.to_owned();
+	let client_path = client_bin
+		.to_str()
+		.expect("client_bin path must be valid UTF-8")
+		.to_owned();
+	let config_str = config_path
+		.to_str()
+		.expect("config_path must be valid UTF-8")
+		.to_owned();
+	let data_str = data_dir
+		.to_str()
+		.expect("data_dir path must be valid UTF-8")
+		.to_owned();
+
+	let mut server_env = BTreeMap::new();
+	server_env
+		.insert("TUWUNEL_CONFIG".to_owned(), config_str);
+	server_env
+		.insert("TUWUNEL_LOG".to_owned(), "info".to_owned());
+
+	let server_host = Host {
+		network_node_id: 0,
+		host_options: None,
+		processes: vec![Process {
+			path: tuwunel_path,
+			args: None,
+			start_time: Some("1s".to_owned()),
+			expected_final_state: Some("running".to_owned()),
+			environment: Some(server_env),
+			shutdown_time: None,
+			shutdown_signal: Some("SIGTERM".to_owned()),
+		}],
+	};
+
+	let mut hosts = BTreeMap::new();
+	hosts.insert("tuwunel-server".to_owned(), server_host);
+
+	// client-001: creator role, starts at 5s
+	let creator_host = Host {
+		network_node_id: 0,
+		host_options: None,
+		processes: vec![Process {
+			path: client_path.clone(),
+			args: Some(
+				"load-test --server-url \
+				 http://tuwunel-server:8448 \
+				 --role creator --client-id 001"
+					.to_owned(),
+			),
+			start_time: Some("5s".to_owned()),
+			expected_final_state: Some(
+				"exited".to_owned(),
+			),
+			environment: None,
+			shutdown_time: None,
+			shutdown_signal: None,
+		}],
+	};
+	hosts.insert("client-001".to_owned(), creator_host);
+
+	// client-002 through client-{N}: joiner role, start at 10s
+	for i in 2..=client_count {
+		let joiner_host = Host {
+			network_node_id: 0,
+			host_options: None,
+			processes: vec![Process {
+				path: client_path.clone(),
+				args: Some(format!(
+					"load-test --server-url \
+					 http://tuwunel-server:8448 \
+					 --role joiner --client-id {i:03}"
+				)),
+				start_time: Some("10s".to_owned()),
+				expected_final_state: Some(
+					"exited".to_owned(),
+				),
+				environment: None,
+				shutdown_time: None,
+				shutdown_signal: None,
+			}],
+		};
+		hosts.insert(
+			format!("client-{i:03}"),
+			joiner_host,
+		);
+	}
+
+	ShadowConfig {
+		general: General {
+			stop_time: stop_time.to_owned(),
+			seed,
+			model_unblocked_syscall_latency: true,
+			data_directory: Some(data_str),
+			log_level: Some("info".to_owned()),
+		},
+		network: topology.to_network(),
+		host_option_defaults: Some(
+			HostOptionDefaults::default(),
+		),
+		hosts,
+	}
+}
+
 /// Named network topology fixture for Shadow simulations.
 /// Per D-01: builder functions, type-safe, composable.
 /// Per D-02: sensible defaults with optional overrides.

@@ -63,6 +63,21 @@ enum Commands {
 		#[arg(long)]
 		role: String,
 	},
+
+	/// Load test: register, login, join room, send message
+	LoadTest {
+		/// Base URL of the tuwunel server
+		#[arg(long)]
+		server_url: String,
+
+		/// Role for this client process ("creator" or "joiner")
+		#[arg(long)]
+		role: String,
+
+		/// Client ID (e.g., "001", "002")
+		#[arg(long)]
+		client_id: String,
+	},
 }
 
 fn main() -> ExitCode {
@@ -86,6 +101,15 @@ fn main() -> ExitCode {
 			)),
 		| Commands::SasVerify { server_url, role } =>
 			run_in_runtime(run_sas_verify(&server_url, &role)),
+		| Commands::LoadTest {
+			server_url,
+			role,
+			client_id,
+		} => run_in_runtime(run_load_test(
+			&server_url,
+			&role,
+			&client_id,
+		)),
 	}
 }
 
@@ -192,6 +216,17 @@ async fn run_sas_verify(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	shadow_test_harness::scenarios::sas_verify::run_sas_verify(
 		server_url, role,
+	)
+	.await
+}
+
+async fn run_load_test(
+	server_url: &str,
+	role: &str,
+	client_id: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+	shadow_test_harness::scenarios::load_test::run_load_test(
+		server_url, role, client_id,
 	)
 	.await
 }
