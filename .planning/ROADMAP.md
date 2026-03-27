@@ -75,8 +75,11 @@ Plans:
   2. Two EmbeddedHomeserver instances start concurrently in the same test process without panicking (OnceLock guards working)
   3. EmbeddedHomeserver::stop() completes graceful shutdown; the process does not leak the RocksDB tempdir
   4. EmbeddedHomeserver::register_user() registers a Matrix user and returns credentials usable against base_url
-**Plans**: TBD
-**Note**: EMBD-10 (in-memory axum Router transport) is the most complex item in this phase. Research identified it as potentially v2 scope. It is mapped here as a v1 requirement per REQUIREMENTS.md but may be deferred at plan time if the axum Router extraction proves non-trivial.
+**Plans:** 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — OnceLock multi-call fix in runtime.rs, embed crate scaffold with config builder
+- [ ] 04-02-PLAN.md — EmbeddedHomeserver lifecycle (stop, register_user), multi-instance integration test
+**Note**: EMBD-10 (in-memory axum Router transport) deferred to v2 per D-05. TCP + port 0 is sufficient for v1.
 
 ## Progress
 
@@ -88,4 +91,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Shadow Infrastructure | 0/3 | Planned | - |
 | 2. CS API and E2EE Tests | 0/4 | Planned | - |
 | 3. Network Conditions and Load | 2/2 | Complete   | 2026-03-27 |
-| 4. Embed Crate | 0/TBD | Not started | - |
+| 4. Embed Crate | 0/2 | Planned | - |
