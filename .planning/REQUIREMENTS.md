@@ -59,15 +59,15 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Embed Crate
 
 - [x] **EMBD-01**: `tuwunel-embed` crate exists as a new workspace member with `EmbeddedHomeserver` struct
-- [ ] **EMBD-02**: `EmbeddedHomeserver::start(config)` starts a tuwunel server in-process and returns when ready
+- [x] **EMBD-02**: `EmbeddedHomeserver::start(config)` starts a tuwunel server in-process and returns when ready
 - [x] **EMBD-03**: `EmbeddedHomeserver::base_url()` returns the URL to connect to (with actual bound port)
-- [ ] **EMBD-04**: `EmbeddedHomeserver::stop()` performs graceful shutdown via the server's broadcast channel
+- [x] **EMBD-04**: `EmbeddedHomeserver::stop()` performs graceful shutdown via the server's broadcast channel
 - [x] **EMBD-05**: `EmbeddedHomeserver` uses an auto-provisioned tempdir for RocksDB (no manual path needed)
-- [ ] **EMBD-06**: Multiple `EmbeddedHomeserver` instances can run concurrently in the same process
-- [ ] **EMBD-07**: Tracing/logging initialization is guarded against double-registration panics
+- [x] **EMBD-06**: Multiple `EmbeddedHomeserver` instances can run concurrently in the same process
+- [x] **EMBD-07**: Tracing/logging initialization is guarded against double-registration panics
 - [x] **EMBD-08**: OnceLock statics in runtime.rs are handled safely for embed use (no panic on re-init)
-- [ ] **EMBD-09**: `EmbeddedHomeserver::register_user()` convenience method registers a user via the Matrix API
-- [ ] **EMBD-10**: In-memory HTTP transport available via extracted axum Router (no TCP socket needed)
+- [x] **EMBD-09**: `EmbeddedHomeserver::register_user()` convenience method registers a user via the Matrix API
+- [x] **EMBD-10**: In-memory HTTP transport available via extracted axum Router (no TCP socket needed)
 
 ## v2 Requirements
 
@@ -135,15 +135,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOAD-02 | Phase 3 | Complete |
 | LOAD-03 | Phase 3 | Complete |
 | EMBD-01 | Phase 4 | Complete |
-| EMBD-02 | Phase 4 | Pending |
+| EMBD-02 | Phase 4 | Complete |
 | EMBD-03 | Phase 4 | Complete |
-| EMBD-04 | Phase 4 | Pending |
+| EMBD-04 | Phase 4 | Complete |
 | EMBD-05 | Phase 4 | Complete |
-| EMBD-06 | Phase 4 | Pending |
-| EMBD-07 | Phase 4 | Pending |
+| EMBD-06 | Phase 4 | Complete |
+| EMBD-07 | Phase 4 | Complete |
 | EMBD-08 | Phase 4 | Complete |
-| EMBD-09 | Phase 4 | Pending |
-| EMBD-10 | Phase 4 | Pending |
+| EMBD-09 | Phase 4 | Complete |
+| EMBD-10 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 41 total

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-27T17:17:39.074Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-27T17:22:26.738Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -54,6 +54,7 @@ Plan: 2 of 2
 | Phase 02 P04 | 3min | 2 tasks | 3 files |
 | Phase 03 P02 | 3min | 2 tasks | 5 files |
 | Phase 04 P01 | 7min | 2 tasks | 5 files |
+| Phase 04 P02 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Used get_or_init for OnceLock statics -- first-caller-wins for multi-instance safety
 - [Phase 04]: Made logging::init public for embed crate access; log_global_default=false avoids subscriber conflicts
 - [Phase 04]: Used default-features=false on tuwunel dep to avoid io_uring build requirement
+- [Phase 04]: Shutdown order: signal -> run_handle.await -> router::stop() for correct Arc unwrap
+- [Phase 04]: EMBD-10 in-memory transport explicitly deferred to v2, documented in embed module docs
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T17:17:39.073Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-27T17:22:26.735Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
