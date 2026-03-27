@@ -77,7 +77,7 @@ Plans:
   4. EmbeddedHomeserver::register_user() registers a Matrix user and returns credentials usable against base_url
 **Plans:** 2 plans
 Plans:
-- [ ] 04-01-PLAN.md — OnceLock multi-call fix in runtime.rs, embed crate scaffold with config builder
+- [x] 04-01-PLAN.md — OnceLock multi-call fix in runtime.rs, embed crate scaffold with config builder
 - [ ] 04-02-PLAN.md — EmbeddedHomeserver lifecycle (stop, register_user), multi-instance integration test
 **Note**: EMBD-10 (in-memory axum Router transport) deferred to v2 per D-05. TCP + port 0 is sufficient for v1.
 

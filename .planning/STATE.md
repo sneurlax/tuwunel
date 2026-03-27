@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-27T05:08:52.942Z"
+status: Ready to execute
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-27T17:17:39.074Z"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Deterministic, reproducible E2E tests that verify tuwunel's Matrix protocol behavior under realistic network conditions
-**Current focus:** Phase 03 — network-conditions-and-load
+**Current focus:** Phase 04 — embed-crate
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 04 (embed-crate) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: Not started
 | Phase 02 P02 | 3min | 2 tasks | 5 files |
 | Phase 02 P04 | 3min | 2 tasks | 3 files |
 | Phase 03 P02 | 3min | 2 tasks | 5 files |
+| Phase 04 P01 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Manual URL percent-encoding for room aliases to avoid adding urlencoding dependency
 - [Phase 02]: Used raw CS API to-device messaging for SAS verification instead of matrix-sdk (async-channel conflict)
 - [Phase 03]: Creator starts at 5s, joiners at 10s for room creation ordering
+- [Phase 04]: Used get_or_init for OnceLock statics -- first-caller-wins for multi-instance safety
+- [Phase 04]: Made logging::init public for embed crate access; log_global_default=false avoids subscriber conflicts
+- [Phase 04]: Used default-features=false on tuwunel dep to avoid io_uring build requirement
 
 ### Pending Todos
 
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T05:05:27.012Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-27T17:17:39.073Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
