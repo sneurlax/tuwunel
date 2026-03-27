@@ -11,13 +11,13 @@ use tuwunel_core::{
 };
 
 #[cfg(feature = "perf_measurements")]
-pub(crate) type TracingFlameGuard =
+pub type TracingFlameGuard =
 	Option<tracing_flame::FlushGuard<std::io::BufWriter<std::fs::File>>>;
 
 #[cfg(not(feature = "perf_measurements"))]
-pub(crate) type TracingFlameGuard = Option<()>;
+pub type TracingFlameGuard = Option<()>;
 
-pub(crate) fn init(config: &Config) -> Result<(TracingFlameGuard, Logging)> {
+pub fn init(config: &Config) -> Result<(TracingFlameGuard, Logging)> {
 	let reload_handles = LogLevelReloadHandles::default();
 	let cap_state = Arc::new(capture::State::new());
 
