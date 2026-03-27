@@ -61,6 +61,24 @@ pub struct HostOptions {
 	pub pcap_capture_size: Option<String>,
 }
 
+/// Shadow's expected_final_state for a process.
+/// Must match Shadow's untagged ProcessFinalState enum exactly:
+/// - `running` serializes as bare string
+/// - `{exited: N}` serializes as map with exit code
+/// - `{signaled: SIG}` serializes as map with signal name
+#[derive(Serialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum ProcessFinalState {
+	Running(RunningVal),
+	Exited { exited: i32 },
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum RunningVal {
+	#[serde(rename = "running")]
+	Running,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct Process {
 	pub path: String,
@@ -69,7 +87,7 @@ pub struct Process {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub start_time: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub expected_final_state: Option<String>,
+	pub expected_final_state: Option<ProcessFinalState>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub environment: Option<BTreeMap<String, String>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -181,7 +199,7 @@ pub fn three_host_config(
 			path: tuwunel_path,
 			args: None,
 			start_time: Some("1s".to_owned()),
-			expected_final_state: Some("running".to_owned()),
+			expected_final_state: Some(ProcessFinalState::Running(RunningVal::Running)),
 			environment: Some(server_env),
 			shutdown_time: None,
 			shutdown_signal: Some("SIGTERM".to_owned()),
@@ -198,7 +216,7 @@ pub fn three_host_config(
 				 http://tuwunel-server:8448 --role alice"
 			)),
 			start_time: Some(alice_start.to_owned()),
-			expected_final_state: Some("exited".to_owned()),
+			expected_final_state: Some(ProcessFinalState::Exited { exited: 0 }),
 			environment: None,
 			shutdown_time: None,
 			shutdown_signal: None,
@@ -215,7 +233,7 @@ pub fn three_host_config(
 				 http://tuwunel-server:8448 --role bob"
 			)),
 			start_time: Some(bob_start.to_owned()),
-			expected_final_state: Some("exited".to_owned()),
+			expected_final_state: Some(ProcessFinalState::Exited { exited: 0 }),
 			environment: None,
 			shutdown_time: None,
 			shutdown_signal: None,
@@ -288,7 +306,7 @@ pub fn load_test_config(
 			path: tuwunel_path,
 			args: None,
 			start_time: Some("1s".to_owned()),
-			expected_final_state: Some("running".to_owned()),
+			expected_final_state: Some(ProcessFinalState::Running(RunningVal::Running)),
 			environment: Some(server_env),
 			shutdown_time: None,
 			shutdown_signal: Some("SIGTERM".to_owned()),
@@ -312,7 +330,7 @@ pub fn load_test_config(
 			),
 			start_time: Some("5s".to_owned()),
 			expected_final_state: Some(
-				"exited".to_owned(),
+				ProcessFinalState::Exited { exited: 0 },
 			),
 			environment: None,
 			shutdown_time: None,
@@ -335,7 +353,7 @@ pub fn load_test_config(
 				)),
 				start_time: Some("10s".to_owned()),
 				expected_final_state: Some(
-					"exited".to_owned(),
+					ProcessFinalState::Exited { exited: 0 },
 				),
 				environment: None,
 				shutdown_time: None,
